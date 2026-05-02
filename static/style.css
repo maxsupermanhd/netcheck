@@ -1,0 +1,32 @@
+html,
+body {
+	padding: 0px;
+	margin: 0px;
+	height: 100%;
+}
+
+section {
+	padding: 4px;
+}
+
+.mainbox {
+	display: grid;
+	grid-template-areas: "menu content";
+	grid-template-columns: 1fr 4fr;
+	gap: 3px;
+	color: #ddd;
+	height: 100%;
+}
+
+.mainbox > div.left {
+	grid-area: menu;
+	padding: 7px;
+	background-color: #122;
+	min-width: 220px;
+}
+
+.mainbox > div.right {
+	grid-area: content;
+	background-color: #112;
+	padding: 10px;
+}

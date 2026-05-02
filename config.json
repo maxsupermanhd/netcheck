@@ -1,0 +1,31 @@
+{
+	"endpoints": [
+		"vk.com",
+		"crypto.cloudflare.com/cdn-cgi/trace",
+		"cloudflare.com/cdn-cgi/trace",
+		"developer.mozilla.org/en-US/",
+		"www.google.com",
+
+		"github.com",
+		"go.dev",
+		"pkg.go.dev",
+		"www.twitch.tv",
+		"lichess.org",
+
+		"www.jsdelivr.com",
+		"cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js",
+
+		"rutracker.org/forum/index.php",
+		"www.chess.com",
+		"discord.com",
+		"www.youtube.com",
+		"telegram.org",
+		"x.com",
+
+		"7tv.app",
+		"7tv.io",
+		"betterttv.com",
+		"www.frankerfacez.com",
+		"dunkbin.com/backpack/473064207/?"
+	]
+}

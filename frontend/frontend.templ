@@ -1,0 +1,87 @@
+package frontend
+
+import (
+	"main/lib/netcheck"
+	"maps"
+	"slices"
+)
+
+templ Page(content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0"/>
+			<link href="/static/style.css" rel="stylesheet"/>
+			<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+			<script src="https://cdn.jsdelivr.net/npm/htmx-ext-ws@2.0.4" integrity="sha384-1RwI/nvUSrMRuNj7hX1+27J8XDdCoSLf0EjEyF69nacuWyiJYoQ/j39RT1mSnd2G" crossorigin="anonymous"></script>
+			<title>cheburnet?</title>
+		</head>
+		<body>
+			@content
+		</body>
+	</html>
+}
+
+templ Index() {
+	<div class="mainbox" hx-ext="ws" ws-connect="/ws">
+		<div class="left">
+			<div>Status: <span id="status">pre-js</span></div>
+			<hr/>
+			<button class="btn">check</button>
+		</div>
+		<div class="right">
+			<div id="results"></div>
+		</div>
+	</div>
+}
+
+templ StatusesTable(endpoints []netcheck.EndpointResults) {
+	if len(endpoints) == 0 {
+		no results
+		{{ return }}
+	}
+	{{
+		checksNames := []string{}
+		for _, endpoint := range endpoints {
+			checksNames = slices.AppendSeq(checksNames, maps.Keys(endpoint.Results))
+		}
+		slices.Sort(checksNames)
+		checksNames = slices.Compact(checksNames)
+	}}
+	<table>
+		<thead>
+			<tr>
+				<th>#</th>
+				<th>endpoint</th>
+				<th>resolve</th>
+				for _, checkName := range checksNames {
+					<th>{ checkName }</th>
+				}
+			</tr>
+		</thead>
+		<tbody>
+			for i, endpoint := range endpoints {
+				<tr>
+					<td>{ i }</td>
+					<td>{ endpoint.Endpoint.Endpoint }</td>
+					<td>{ endpoint.ResolvedTo }</td>
+					for _, checkName := range checksNames {
+						{{ res, ok := endpoint.Results[checkName] }}
+						<td>
+							if ok {
+								@showCheckResult(res)
+							} else {
+								???
+							}
+						</td>
+					}
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+templ showCheckResult(res netcheck.CheckResult) {
+	<span style={ "color: " + res.Color } title={ res.Content }>{ res.Brief }</span>
+}
