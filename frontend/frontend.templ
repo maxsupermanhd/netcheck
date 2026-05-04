@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"main/lib/netcheck"
 	"maps"
 	"slices"
@@ -28,7 +29,7 @@ templ Index() {
 		<div class="left">
 			<div>Status: <span id="status">pre-js</span></div>
 			<hr/>
-			<button class="btn">check</button>
+			// <button class="btn">check</button>
 		</div>
 		<div class="right">
 			<div id="results"></div>
@@ -78,6 +79,29 @@ templ StatusesTable(endpoints []netcheck.EndpointResults) {
 					}
 				</tr>
 			}
+			<tfoot>
+				<tr>
+					<th colspan="3">∑</th>
+					{{
+						greenByName := map[string]int{}
+						for _, endpoint := range endpoints {
+							for checkName, checkResult := range endpoint.Results {
+								if checkResult.Color == "green" {
+									greenByName[checkName] = greenByName[checkName] + 1
+								}
+							}
+						}
+					}}
+					for _, checkName := range checksNames {
+						<td>
+							<div><span style="color: green">{ greenByName[checkName] }</span> / <span style="color: red">{ len(endpoints) - greenByName[checkName] }</span></div>
+							<div>
+								{ fmt.Sprintf("%.0f", 100*float64(greenByName[checkName])/float64(len(endpoints))) }%
+							</div>
+						</td>
+					}
+				</tr>
+			</tfoot>
 		</tbody>
 	</table>
 }
