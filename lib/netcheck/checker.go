@@ -130,15 +130,21 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 				Results:  map[string]CheckResult{},
 			}
 			for _, check := range checks {
-				eres.Results[check.Name] = checkResultPending
+				eres.Results[check.Name] = checkResultScheduled
 			}
 			c.lock.Lock()
 			c.results[i] = eres
 			c.broadcastUpdateNOLOCK()
 			c.lock.Unlock()
 
+			time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+
 			for _, check := range checks {
 				minWait := 5 * time.Second
+				c.lock.Lock()
+				eres.Results[check.Name] = checkResultPending
+				c.broadcastUpdateNOLOCK()
+				c.lock.Unlock()
 				cres := performCheck(check.Fn, endpoint, 5*time.Second)
 				c.lock.Lock()
 				eres.Results[check.Name] = cres
@@ -156,10 +162,16 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 	c.lock.Unlock()
 }
 
-var checkResultPending = CheckResult{
-	Brief: "schd",
-	Color: "gray",
-}
+var (
+	checkResultScheduled = CheckResult{
+		Brief: "schd",
+		Color: "gray",
+	}
+	checkResultPending = CheckResult{
+		Brief: "check",
+		Color: "gray",
+	}
+)
 
 func performCheck(checkFn CheckFunc, desc EndpointDescription, timeout time.Duration) CheckResult {
 	perf := time.Now()
