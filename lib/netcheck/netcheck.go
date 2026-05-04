@@ -260,16 +260,16 @@ type ErrPartialRead struct {
 }
 
 func (e ErrPartialRead) Error() string {
-	return "partial read, got %d need %d: " + e.err.Error()
+	return fmt.Sprintf("partial read, got %d need %d: %s", e.got, e.need, e.err.Error())
 }
 
 func (e ErrPartialRead) Is(target error) bool {
 	var ok bool
-	_, ok = target.(ErrRedir)
+	_, ok = target.(ErrPartialRead)
 	if ok {
 		return true
 	}
-	_, ok = target.(*ErrRedir)
+	_, ok = target.(*ErrPartialRead)
 	if ok {
 		return true
 	}
