@@ -16,6 +16,29 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
+func CheckEndpointResolve(desc EndpointDescription, timeout time.Duration) error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
+	defer ctxCancel()
+	domain := strings.Split(desc.Endpoint, "/")[0]
+	addrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
+	if err != nil {
+		return err
+	}
+	if len(addrs) == 0 {
+		return ErrNoDnsRecords
+	}
+	if len(addrs) == 1 {
+		return ErrDnsResolved{
+			Brief: addrs[0].String(),
+			Res:   addrs,
+		}
+	}
+	return ErrDnsResolved{
+		Brief: addrs[0].String() + " +" + strconv.Itoa(len(addrs)-1),
+		Res:   addrs,
+	}
+}
+
 func CheckEndpointPlainHTTP(desc EndpointDescription, timeout time.Duration) error {
 	cl := &http.Client{
 		Transport: http.DefaultTransport,
@@ -229,8 +252,11 @@ func lookupHTTPS(domain string) (ret []byte, err error) {
 	return nil, ErrNoEchDns
 }
 
-var ErrEchNotUsed = errors.New("ech not used")
-var ErrNoEchDns = errors.New("no https record")
+var (
+	ErrEchNotUsed   = errors.New("ech not used")
+	ErrNoEchDns     = errors.New("no https record")
+	ErrNoDnsRecords = errors.New("no dns records")
+)
 
 type ErrRedir struct {
 	to string
@@ -270,6 +296,28 @@ func (e ErrPartialRead) Is(target error) bool {
 		return true
 	}
 	_, ok = target.(*ErrPartialRead)
+	if ok {
+		return true
+	}
+	return false
+}
+
+type ErrDnsResolved struct {
+	Brief string
+	Res   []net.IP
+}
+
+func (e ErrDnsResolved) Error() string {
+	return e.Brief
+}
+
+func (e ErrDnsResolved) Is(target error) bool {
+	var ok bool
+	_, ok = target.(ErrDnsResolved)
+	if ok {
+		return true
+	}
+	_, ok = target.(*ErrDnsResolved)
 	if ok {
 		return true
 	}

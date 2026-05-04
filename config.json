@@ -18,9 +18,19 @@
 		"rutracker.org/forum/index.php",
 		"www.chess.com",
 		"discord.com",
+		{
+			"Endpoint": "cdn.discordapp.com/media/v1/collectibles-shop/1409898407769673900/static",
+			"Alias": "cdn.discordapp.com decoration"
+		},
 		"www.youtube.com",
 		"www.protondb.com",
-		"wiki.gg",
+		"www.wiki.gg",
+		"store.steampowered.com",
+		"steamcommunity.com",
+		{
+			"Endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2",
+			"Alias": "store.fastly.steamstatic.com banner"
+		},
 
 		"telegram.org",
 		"x.com",

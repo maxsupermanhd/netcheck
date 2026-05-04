@@ -30,3 +30,11 @@ section {
 	background-color: #112;
 	padding: 10px;
 }
+
+a {
+	color: #ddd;
+}
+
+a:visited {
+	color: #aaf;
+}

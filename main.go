@@ -21,6 +21,7 @@ var (
 	cfg          lac.Conf
 
 	netChecker *netcheck.Checker
+	netChecks  = netcheck.DefaultChecks
 )
 
 func main() {
@@ -33,7 +34,7 @@ func main() {
 			MaxSize:  cfg.GetDInt(500, "logs", "maxSize"),
 			Compress: true,
 		}))
-	netChecker = netcheck.NewChecker(getConfigEndpoints())
+	netChecker = netcheck.NewChecker(getConfigEndpoints(), netChecks)
 
 	stopHttp := flexutils.StartBackgroundRoutine(log.Logger, "http", httpRoutine)
 	stopChecker := flexutils.StartBackgroundRoutine(log.Logger, "checker", netChecker.Run)
@@ -62,6 +63,13 @@ func getConfigEndpoints() []netcheck.EndpointDescription {
 			ret = append(ret, netcheck.EndpointDescription{
 				Endpoint: ee,
 			})
+		case map[string]any:
+			ed := netcheck.EndpointDescription{}
+			var ok bool
+			ed.Endpoint, ok = ee["Endpoint"].(string)
+			ed.Alias, ok = ee["Alias"].(string)
+			_ = ok
+			ret = append(ret, ed)
 		}
 	}
 	return ret

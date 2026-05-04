@@ -16,7 +16,7 @@ import (
 
 func handleWebsocket(ws *websocket.Conn) {
 	wsSendElem(ws, "span", "status", netChecker.GetState())
-	wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults()))
+	wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
 	closeChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	wg.Go(func() {
@@ -24,7 +24,7 @@ func handleWebsocket(ws *websocket.Conn) {
 			select {
 			case <-netChecker.ListenChan():
 				wsSendElem(ws, "span", "status", netChecker.GetState())
-				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults()))
+				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
 			case <-closeChan:
 				return
 			}
