@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func httpRoutine(exitChan <-chan struct{}) {
+func httpRoutine(ctx context.Context) {
 	listenAddr := cfg.GetDString("0.0.0.0:40124", "http", "listenAddr")
 	serv := http.Server{
 		Addr:    listenAddr,
@@ -30,7 +30,7 @@ func httpRoutine(exitChan <-chan struct{}) {
 		}
 	})
 
-	<-exitChan
+	<-ctx.Done()
 
 	ctx, ctxc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer ctxc()

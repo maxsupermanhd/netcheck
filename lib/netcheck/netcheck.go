@@ -3,127 +3,181 @@ package netcheck
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"main/lib/iocount"
 	"net"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func CheckEndpointResolve(desc EndpointDescription, timeout time.Duration) error {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
+func CheckEndpointResolve(ctx context.Context, desc EndpointDescription) error {
 	domain := strings.Split(desc.Endpoint, "/")[0]
 	addrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
 	if err != nil {
 		return err
 	}
 	if len(addrs) == 0 {
-		return ErrNoDnsRecords
-	}
-	if len(addrs) == 1 {
-		return ErrDnsResolved{
-			Brief: addrs[0].String(),
-			Res:   addrs,
+		return CheckResult{
+			Brief:   "FAIL",
+			Color:   "red",
+			Success: -1,
 		}
 	}
-	return ErrDnsResolved{
-		Brief: addrs[0].String() + " +" + strconv.Itoa(len(addrs)-1),
-		Res:   addrs,
+	if len(addrs) == 1 {
+		return CheckResult{
+			Brief:     addrs[0].String(),
+			BriefHTML: fmt.Sprintf(`<a href="%s">%s</a>`, "https://ipinfo.io/"+addrs[0].String(), addrs[0].String()),
+			Success:   1,
+		}
+	}
+	return CheckResult{
+		Brief:     addrs[0].String() + " +" + strconv.Itoa(len(addrs)-1),
+		BriefHTML: fmt.Sprintf(`<a href="%s">%s</a> +%d`, "https://ipinfo.io/"+addrs[0].String(), addrs[0].String(), len(addrs)-1),
+		Success:   1,
 	}
 }
 
-func CheckEndpointPlainHTTP(desc EndpointDescription, timeout time.Duration) error {
+func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
+	domain := strings.Split(desc.Endpoint, "/")[0]
+	addrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
+	if err != nil {
+		return err
+	}
+	if len(addrs) == 0 {
+		return CheckResult{
+			Brief:   "FAIL",
+			Color:   "red",
+			Success: -1,
+			Content: "it was dns",
+		}
+	}
+	cmd := exec.CommandContext(ctx, `ping`, addrs[0].String(), `-w`, `4`, `-c`, `1`)
+	o, err := cmd.Output()
+	if err != nil {
+		return CheckResult{
+			Brief:   "FAIL",
+			Color:   "red",
+			Success: -1,
+			Content: fmt.Sprintf("%s\nexit code: %d\nerr: %s", string(o), cmd.ProcessState.ExitCode(), err.Error()),
+		}
+	}
+	if cmd.ProcessState.ExitCode() == 0 {
+		o2 := strings.Split(string(o), "\n")
+		if len(o2) != 7 {
+			return CheckResult{
+				Brief:   "???",
+				Color:   "black",
+				Success: -1,
+				Content: strconv.Itoa(len(o2)) + "\n" + string(o),
+			}
+		}
+		o3 := strings.TrimPrefix(o2[len(o2)-2], "rtt min/avg/max/mdev = ")
+		if o3 == "" {
+			return CheckResult{
+				Brief:   "FAIL",
+				Color:   "red",
+				Success: -1,
+				Content: "o3 fail\n" + string(o),
+			}
+		}
+		o4 := strings.Split(o3, "/")
+		if len(o4) < 2 {
+			return CheckResult{
+				Brief:   "???",
+				Color:   "black",
+				Success: -1,
+				Content: "o4 fail\n" + string(o),
+			}
+		}
+		return CheckResult{
+			Brief:   o4[0],
+			Color:   "green",
+			Success: 1,
+			Content: string(o),
+		}
+	}
+	return CheckResult{
+		Brief:   "FAIL",
+		Color:   "red",
+		Success: -1,
+		Content: fmt.Sprintf("%s\nexit code: %d", string(o), cmd.ProcessState.ExitCode()),
+	}
+}
+
+func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error {
 	cl := &http.Client{
 		Transport: http.DefaultTransport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+desc.Endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0")
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	return checkReq(cl, req)
 }
 
-func CheckEndpointTLS12(desc EndpointDescription, timeout time.Duration) error {
+func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
 	cl := &http.Client{
-		Timeout: timeout,
 		Transport: &http.Transport{
 			ReadBufferSize: 1,
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
 				MaxVersion: tls.VersionTLS12,
 			},
-			TLSHandshakeTimeout:   timeout,
-			DisableKeepAlives:     true,
-			DisableCompression:    false,
-			IdleConnTimeout:       timeout,
-			ResponseHeaderTimeout: timeout,
-			TLSNextProto:          nil,
-			ForceAttemptHTTP2:     false,
-			HTTP2:                 nil,
+			DisableKeepAlives:  true,
+			DisableCompression: false,
+			TLSNextProto:       nil,
+			ForceAttemptHTTP2:  false,
+			HTTP2:              nil,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0")
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	return checkReq(cl, req)
 }
 
-func CheckEndpointTLS13(desc EndpointDescription, timeout time.Duration) error {
+func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 	cl := &http.Client{
-		Timeout: timeout,
 		Transport: &http.Transport{
 			ReadBufferSize: 1,
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS13,
 				MaxVersion: tls.VersionTLS13,
 			},
-			TLSHandshakeTimeout:   timeout,
-			DisableKeepAlives:     true,
-			DisableCompression:    false,
-			IdleConnTimeout:       timeout,
-			ResponseHeaderTimeout: timeout,
-			TLSNextProto:          nil,
-			ForceAttemptHTTP2:     false,
-			HTTP2:                 nil,
+			DisableKeepAlives:  true,
+			DisableCompression: false,
+			TLSNextProto:       nil,
+			ForceAttemptHTTP2:  false,
+			HTTP2:              nil,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0")
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	return checkReq(cl, req)
 }
 
-func CheckEndpointTLS13ECH(desc EndpointDescription, timeout time.Duration) error {
-	dialer := &net.Dialer{
-		Timeout: timeout,
-	}
+func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error {
+	dialer := &net.Dialer{}
 	domain := strings.Split(desc.Endpoint, "/")[0]
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS13,
@@ -131,18 +185,14 @@ func CheckEndpointTLS13ECH(desc EndpointDescription, timeout time.Duration) erro
 		ServerName: domain,
 	}
 	cl := &http.Client{
-		Timeout: timeout,
 		Transport: &http.Transport{
-			ReadBufferSize:        1,
-			TLSClientConfig:       tlsConfig,
-			TLSHandshakeTimeout:   timeout,
-			DisableKeepAlives:     true,
-			DisableCompression:    false,
-			IdleConnTimeout:       timeout,
-			ResponseHeaderTimeout: timeout,
-			TLSNextProto:          nil,
-			ForceAttemptHTTP2:     false,
-			HTTP2:                 nil,
+			ReadBufferSize:     1,
+			TLSClientConfig:    tlsConfig,
+			DisableKeepAlives:  true,
+			DisableCompression: false,
+			TLSNextProto:       nil,
+			ForceAttemptHTTP2:  false,
+			HTTP2:              nil,
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				ech, err := lookupHTTPS(domain)
 				if err != nil {
@@ -159,7 +209,11 @@ func CheckEndpointTLS13ECH(desc EndpointDescription, timeout time.Duration) erro
 				}
 				state := tlsConn.ConnectionState()
 				if !state.ECHAccepted {
-					return nil, ErrEchNotUsed
+					return nil, CheckResult{
+						Brief:   "UNUSED",
+						Color:   "yellow",
+						Success: -1,
+					}
 				}
 				return tlsConn, nil
 			},
@@ -168,13 +222,11 @@ func CheckEndpointTLS13ECH(desc EndpointDescription, timeout time.Duration) erro
 			return http.ErrUseLastResponse
 		},
 	}
-	ctx, ctxCancel := context.WithTimeout(context.Background(), timeout)
-	defer ctxCancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0")
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	return checkReq(cl, req)
 }
 
@@ -184,7 +236,12 @@ func checkReq(cl *http.Client, req *http.Request) error {
 		return fmt.Errorf("req do: %w", err)
 	}
 	if rsp.StatusCode/100 == 3 {
-		return ErrRedir{to: rsp.Header.Get("Location")}
+		return CheckResult{
+			Brief:   "REDIR",
+			Color:   "yellow",
+			Success: 0,
+			Content: "redirects to: " + rsp.Header.Get("Location"),
+		}
 	}
 	body := iocount.NewCounterReader(rsp.Body)
 	_, err = io.ReadAll(body)
@@ -249,34 +306,10 @@ func lookupHTTPS(domain string) (ret []byte, err error) {
 			}
 		}
 	}
-	return nil, ErrNoEchDns
-}
-
-var (
-	ErrEchNotUsed   = errors.New("ech not used")
-	ErrNoEchDns     = errors.New("no https record")
-	ErrNoDnsRecords = errors.New("no dns records")
-)
-
-type ErrRedir struct {
-	to string
-}
-
-func (e ErrRedir) Error() string {
-	return "redirect: " + strconv.Quote(e.to)
-}
-
-func (e ErrRedir) Is(target error) bool {
-	var ok bool
-	_, ok = target.(ErrRedir)
-	if ok {
-		return true
+	return nil, CheckResult{
+		Brief: "NODNS",
+		Color: "gray",
 	}
-	_, ok = target.(*ErrRedir)
-	if ok {
-		return true
-	}
-	return false
 }
 
 type ErrPartialRead struct {
@@ -296,28 +329,6 @@ func (e ErrPartialRead) Is(target error) bool {
 		return true
 	}
 	_, ok = target.(*ErrPartialRead)
-	if ok {
-		return true
-	}
-	return false
-}
-
-type ErrDnsResolved struct {
-	Brief string
-	Res   []net.IP
-}
-
-func (e ErrDnsResolved) Error() string {
-	return e.Brief
-}
-
-func (e ErrDnsResolved) Is(target error) bool {
-	var ok bool
-	_, ok = target.(ErrDnsResolved)
-	if ok {
-		return true
-	}
-	_, ok = target.(*ErrDnsResolved)
 	if ok {
 		return true
 	}

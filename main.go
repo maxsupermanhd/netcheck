@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -34,10 +35,10 @@ func main() {
 			MaxSize:  cfg.GetDInt(500, "logs", "maxSize"),
 			Compress: true,
 		}))
-	netChecker = netcheck.NewChecker(getConfigEndpoints(), netChecks)
+	netChecker = netcheck.NewChecker(log.Logger, getConfigEndpoints(), netChecks)
 
-	stopHttp := flexutils.StartBackgroundRoutine(log.Logger, "http", httpRoutine)
-	stopChecker := flexutils.StartBackgroundRoutine(log.Logger, "checker", netChecker.Run)
+	stopHttp := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "http", httpRoutine)
+	stopChecker := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "checker", netChecker.Run)
 
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, os.Interrupt)

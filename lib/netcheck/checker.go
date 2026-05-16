@@ -1,12 +1,14 @@
 package netcheck
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"maps"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type EndpointDescription struct {
@@ -18,9 +20,30 @@ type CheckResult struct {
 	Brief     string
 	BriefHTML string
 	Color     string
-	Took      time.Duration
-	Content   string
-	Success   int
+
+	// usually filled outside of the checker
+	Took    time.Duration
+	Content string
+
+	// 0 inconclusive >0 positive <0 negative
+	Success int
+}
+
+func (e CheckResult) Error() string {
+	return e.Content
+}
+
+func (e CheckResult) Is(target error) bool {
+	var ok bool
+	_, ok = target.(CheckResult)
+	if ok {
+		return true
+	}
+	_, ok = target.(*CheckResult)
+	if ok {
+		return true
+	}
+	return false
 }
 
 type EndpointResults struct {
@@ -35,6 +58,8 @@ func (e EndpointResults) Clone() EndpointResults {
 }
 
 type Checker struct {
+	logger zerolog.Logger
+
 	endpoints []EndpointDescription
 	results   []EndpointResults
 	state     string
@@ -44,10 +69,11 @@ type Checker struct {
 	updateListener chan struct{}
 }
 
-func NewChecker(n []EndpointDescription, checks []Check) *Checker {
+func NewChecker(l zerolog.Logger, n []EndpointDescription, checks []Check) *Checker {
 	c := &Checker{
 		updateListener: make(chan struct{}),
 		checks:         checks,
+		logger:         l,
 	}
 	c.UpdateEndpoints(n)
 	return c
@@ -91,23 +117,22 @@ func (c *Checker) broadcastUpdateNOLOCK() {
 	}
 }
 
-func (c *Checker) Run(exitChan <-chan struct{}) {
+func (c *Checker) Run(ctx context.Context) {
 	for {
-		select {
-		case <-exitChan:
+		if waitOrAbort(ctx.Done(), 5*time.Second) {
 			return
-		case <-time.After(5 * time.Second):
 		}
-		c.doChecks(exitChan)
-		select {
-		case <-exitChan:
+		c.logger.Info().Msg("starting checks")
+		timings := time.Now()
+		c.doChecks(ctx)
+		c.logger.Info().Dur("took", time.Since(timings)).Msg("checks finished")
+		if waitOrAbort(ctx.Done(), 25*time.Second) {
 			return
-		case <-time.After(25 * time.Second):
 		}
 	}
 }
 
-type CheckFunc func(EndpointDescription, time.Duration) error
+type CheckFunc func(context.Context, EndpointDescription) error
 
 type Check struct {
 	Name string
@@ -117,6 +142,7 @@ type Check struct {
 var (
 	DefaultChecks = []Check{
 		{Name: "resolve", Fn: CheckEndpointResolve},
+		{Name: "ping", Fn: CheckEndpointPing},
 		{Name: "http", Fn: CheckEndpointPlainHTTP},
 		{Name: "tls12", Fn: CheckEndpointTLS12},
 		{Name: "tls13", Fn: CheckEndpointTLS13},
@@ -124,7 +150,7 @@ var (
 	}
 )
 
-func (c *Checker) doChecks(exitChan <-chan struct{}) {
+func (c *Checker) doChecks(ctx context.Context) {
 
 	c.lock.Lock()
 	c.results = make([]EndpointResults, len(c.endpoints))
@@ -148,7 +174,9 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 			c.broadcastUpdateNOLOCK()
 			c.lock.Unlock()
 
-			time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+			if waitOrAbort(ctx.Done(), time.Duration(i)*100*time.Millisecond) {
+				return
+			}
 
 			for checkNum, check := range c.checks {
 				minWait := 5 * time.Second
@@ -158,7 +186,9 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 				c.broadcastUpdateNOLOCK()
 				c.lock.Unlock()
 
-				cres := performCheck(check.Fn, endpoint, 5*time.Second)
+				cctx, cctxCancel := context.WithTimeout(ctx, 5*time.Second)
+				cres := performCheck(cctx, check.Fn, endpoint)
+				cctxCancel()
 
 				c.lock.Lock()
 				eres.Results[check.Name] = cres
@@ -166,7 +196,9 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 				c.lock.Unlock()
 
 				if checkNum != len(c.checks)-1 {
-					time.Sleep(minWait - cres.Took)
+					if waitOrAbort(ctx.Done(), minWait-cres.Took) {
+						return
+					}
 				}
 			}
 		})
@@ -180,6 +212,15 @@ func (c *Checker) doChecks(exitChan <-chan struct{}) {
 	c.lock.Unlock()
 }
 
+func waitOrAbort(abort <-chan struct{}, wait time.Duration) bool {
+	select {
+	case <-time.After(wait):
+		return false
+	case <-abort:
+		return true
+	}
+}
+
 var (
 	checkResultScheduled = CheckResult{
 		Brief: "schd",
@@ -191,9 +232,9 @@ var (
 	}
 )
 
-func performCheck(checkFn CheckFunc, desc EndpointDescription, timeout time.Duration) CheckResult {
+func performCheck(ctx context.Context, checkFn CheckFunc, desc EndpointDescription) CheckResult {
 	perf := time.Now()
-	err := checkFn(desc, timeout)
+	err := checkFn(ctx, desc)
 	ret := CheckResult{
 		Brief:   "OK",
 		Color:   "green",
@@ -204,36 +245,14 @@ func performCheck(checkFn CheckFunc, desc EndpointDescription, timeout time.Dura
 		return ret
 	}
 	ret.Content = err.Error()
-	if errors.Is(err, ErrDnsResolved{}) {
-		err2 := err.(ErrDnsResolved)
-		ret.Brief = err.Error()
-		ret.BriefHTML = fmt.Sprintf(`<a href="%s">%s</a>`, "https://ipinfo.io/"+err2.Res[0].String(), err.Error())
-		ret.Color = ""
-		ret.Success = -1
-		return ret
-	}
-	if errors.Is(err, ErrEchNotUsed) {
-		ret.Brief = "UNUSED"
-		ret.Color = "yellow"
-		ret.Success = -1
-		return ret
-	}
-	if errors.Is(err, ErrNoEchDns) {
-		ret.Brief = "NODNS"
-		ret.Color = "gray"
-		ret.Success = 0
-		return ret
+	if err2, ok := errors.AsType[CheckResult](err); ok {
+		err2.Took = time.Since(perf)
+		return err2
 	}
 	if errors.Is(err, ErrPartialRead{}) {
 		ret.Brief = "FAIL"
 		ret.Color = "orange"
 		ret.Success = -1
-		return ret
-	}
-	if errors.Is(err, ErrRedir{}) {
-		ret.Brief = "REDIR"
-		ret.Color = "yellow"
-		ret.Success = 0
 		return ret
 	}
 	ret.Brief = "FAIL"
