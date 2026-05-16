@@ -89,7 +89,6 @@ func (c *Checker) broadcastUpdateNOLOCK() {
 	if ret != nil {
 		close(ret)
 	}
-	return
 }
 
 func (c *Checker) Run(exitChan <-chan struct{}) {
@@ -239,5 +238,6 @@ func performCheck(checkFn CheckFunc, desc EndpointDescription, timeout time.Dura
 	}
 	ret.Brief = "FAIL"
 	ret.Color = "red"
+	ret.Success = -1
 	return ret
 }

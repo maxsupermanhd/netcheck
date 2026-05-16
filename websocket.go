@@ -36,6 +36,7 @@ func handleWebsocket(ws *websocket.Conn) {
 		err := wsRawCodec.Receive(ws, &msgA)
 		if err != nil {
 			close(closeChan)
+			wg.Wait()
 			return
 		}
 		log.Info().Msg(string(msgA.msg))
