@@ -8,25 +8,26 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maxsupermanhd/lac/v2"
 	"github.com/rs/zerolog"
 )
 
 type EndpointDescription struct {
-	Alias    string
+	Alias    string `json:",omitempty"`
 	Endpoint string
 }
 
 type CheckResult struct {
-	Brief     string
-	BriefHTML string
-	Color     string
+	Brief     string `json:",omitempty"`
+	BriefHTML string `json:",omitempty"`
+	Color     string `json:",omitempty"`
 
 	// usually filled outside of the checker
-	Took    time.Duration
-	Content string
+	Took    time.Duration `json:",omitempty"`
+	Content string        `json:",omitempty"`
 
 	// 0 inconclusive >0 positive <0 negative
-	Success int
+	Success int `json:",omitempty"`
 }
 
 func (e CheckResult) Error() string {
@@ -46,6 +47,12 @@ func (e CheckResult) Is(target error) bool {
 	return false
 }
 
+type RunResults struct {
+	StartedAt time.Time
+	Duration  time.Duration
+	Results   []EndpointResults
+}
+
 type EndpointResults struct {
 	Endpoint EndpointDescription
 	Results  map[string]CheckResult
@@ -59,6 +66,7 @@ func (e EndpointResults) Clone() EndpointResults {
 
 type Checker struct {
 	logger zerolog.Logger
+	cfg    lac.Conf
 
 	endpoints []EndpointDescription
 	results   []EndpointResults
@@ -67,13 +75,17 @@ type Checker struct {
 	checks    []Check
 
 	updateListener chan struct{}
+
+	resultsLogger func(RunResults)
 }
 
-func NewChecker(l zerolog.Logger, n []EndpointDescription, checks []Check) *Checker {
+func NewChecker(l zerolog.Logger, cfg lac.Conf, n []EndpointDescription, checks []Check, resultsLogger func(RunResults)) *Checker {
 	c := &Checker{
+		logger:         l,
+		cfg:            cfg,
 		updateListener: make(chan struct{}),
 		checks:         checks,
-		logger:         l,
+		resultsLogger:  resultsLogger,
 	}
 	c.UpdateEndpoints(n)
 	return c
@@ -118,15 +130,26 @@ func (c *Checker) broadcastUpdateNOLOCK() {
 }
 
 func (c *Checker) Run(ctx context.Context) {
+	if waitOrAbort(ctx.Done(), time.Duration(c.cfg.GetDInt(10, "initialPauseSeconds"))*time.Second) {
+		return
+	}
 	for {
-		if waitOrAbort(ctx.Done(), 5*time.Second) {
-			return
-		}
 		c.logger.Info().Msg("starting checks")
 		timings := time.Now()
 		c.doChecks(ctx)
 		c.logger.Info().Dur("took", time.Since(timings)).Msg("checks finished")
-		if waitOrAbort(ctx.Done(), 25*time.Second) {
+		if c.resultsLogger != nil {
+			select {
+			case <-ctx.Done():
+			default:
+				c.resultsLogger(RunResults{
+					StartedAt: timings,
+					Duration:  time.Since(timings),
+					Results:   c.GetResults(),
+				})
+			}
+		}
+		if waitOrAbort(ctx.Done(), time.Duration(c.cfg.GetDInt(10, "checksIntervalSeconds"))*time.Second) {
 			return
 		}
 	}
@@ -174,19 +197,19 @@ func (c *Checker) doChecks(ctx context.Context) {
 			c.broadcastUpdateNOLOCK()
 			c.lock.Unlock()
 
-			if waitOrAbort(ctx.Done(), time.Duration(i)*100*time.Millisecond) {
+			if waitOrAbort(ctx.Done(), time.Duration(i*c.cfg.GetDInt(100, "staggerSleepMilliseconds"))*time.Millisecond) {
 				return
 			}
 
 			for checkNum, check := range c.checks {
-				minWait := 5 * time.Second
+				minWait := time.Duration(c.cfg.GetDInt(10, "checkIntervalSeconds")) * time.Second
 
 				c.lock.Lock()
 				eres.Results[check.Name] = checkResultPending
 				c.broadcastUpdateNOLOCK()
 				c.lock.Unlock()
 
-				cctx, cctxCancel := context.WithTimeout(ctx, 5*time.Second)
+				cctx, cctxCancel := context.WithTimeout(ctx, time.Duration(c.cfg.GetDInt(10, "checkTimeoutSeconds"))*time.Second)
 				cres := performCheck(cctx, check.Fn, endpoint)
 				cctxCancel()
 

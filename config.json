@@ -1,4 +1,14 @@
 {
+	"netcheck": {
+		"initialPauseSeconds": 10,
+		"checksIntervalSeconds": 60,
+		"staggerSleepMilliseconds": 200,
+		"checkTimeoutSeconds": 5
+	},
+	"results": {
+		"path": "results.json",
+		"limit": 100
+	},
 	"endpoints": [
 		"vk.com",
 		"crypto.cloudflare.com/cdn-cgi/trace",
@@ -16,21 +26,26 @@
 		"www.jsdelivr.com",
 		"cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js",
 
+		"www.youtube.com",
+		{
+			"Alias": "i.ytimg.com",
+			"Endpoint": "i.ytimg.com/vi/gsxrHVagelg/hq720.jpg"
+		},
+
 		"rutracker.org/forum/index.php",
 		"www.chess.com",
 		"discord.com",
 		{
-			"Endpoint": "cdn.discordapp.com/media/v1/collectibles-shop/1409898407769673900/static",
-			"Alias": "cdn.discordapp.com decoration"
+			"Alias": "cdn.discordapp.com decoration",
+			"Endpoint": "cdn.discordapp.com/media/v1/collectibles-shop/1409898407769673900/static"
 		},
-		"www.youtube.com",
 		"www.protondb.com",
 		"www.wiki.gg",
 		"store.steampowered.com",
 		"steamcommunity.com",
 		{
-			"Endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2",
-			"Alias": "store.fastly.steamstatic.com banner"
+			"Alias": "store.fastly.steamstatic.com banner",
+			"Endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2"
 		},
 		"onlywands.com/streamer/DunkOrSlam",
 
@@ -45,12 +60,20 @@
 		"stackoverflow.com/questions",
 		"xdaforums.com",
 		"vdo.ninja",
+		"seedcrack.com",
 
 		"mangadex.org",
 
 		"7tv.app",
-		"7tv.io",
+		{
+			"Alias": "7tv.io",
+			"Endpoint": "7tv.io/v3/emote-sets/global"
+		},
 		"betterttv.com",
+		{
+			"Alias": "cdn.betterttv.net",
+			"Endpoint": "cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/1x.webp"
+		},
 		"www.frankerfacez.com"
 	]
 }

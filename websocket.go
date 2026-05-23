@@ -7,7 +7,6 @@ import (
 	"main/frontend"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/a-h/templ"
 	"github.com/rs/zerolog/log"
@@ -17,18 +16,26 @@ import (
 func handleWebsocket(ws *websocket.Conn) {
 	wsSendElem(ws, "span", "status", netChecker.GetState())
 	wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
+	wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get()))
 	closeChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
+
+	updHistory := storedResults.Listen()
+	updResults := netChecker.ListenChan()
+
 	wg.Go(func() {
 		for {
 			select {
-			case <-netChecker.ListenChan():
+			case <-updHistory:
+				updHistory = storedResults.Listen()
+				wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get()))
+			case <-updResults:
+				updResults = netChecker.ListenChan()
 				wsSendElem(ws, "span", "status", netChecker.GetState())
 				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
 			case <-closeChan:
 				return
 			}
-			time.Sleep(100 * time.Millisecond)
 		}
 	})
 	for {

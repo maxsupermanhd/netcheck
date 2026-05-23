@@ -21,8 +21,9 @@ var (
 	flConfigPath = flag.String("config", "config.json", "path to config json")
 	cfg          lac.Conf
 
-	netChecker *netcheck.Checker
-	netChecks  = netcheck.DefaultChecks
+	netChecker    *netcheck.Checker
+	netChecks     = netcheck.DefaultChecks
+	storedResults *netcheck.ResultsStorage
 )
 
 func main() {
@@ -35,7 +36,9 @@ func main() {
 			MaxSize:  cfg.GetDInt(500, "logs", "maxSize"),
 			Compress: true,
 		}))
-	netChecker = netcheck.NewChecker(log.Logger, getConfigEndpoints(), netChecks)
+	resultsStoragePath := cfg.GetDString("results.json", "results", "path")
+	storedResults = netcheck.NewResultsStorage(noerr(loadJsonIfExists[[]netcheck.RunResults](resultsStoragePath)), cfg.GetDInt(50, "results", "limit"))
+	netChecker = netcheck.NewChecker(log.Logger, cfg.DupSubTree("netcheck"), getConfigEndpoints(), netChecks, storedResults.Add)
 
 	stopHttp := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "http", httpRoutine)
 	stopChecker := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "checker", netChecker.Run)
@@ -48,6 +51,8 @@ func main() {
 
 	stopChecker()
 	stopHttp()
+
+	log.Err(saveJson(resultsStoragePath, storedResults.Get())).Msg("results stored")
 
 	log.Info().Msg("bye")
 }

@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"main/lib/netcheck"
+	"time"
 )
 
 templ Page(content templ.Component) {
@@ -27,12 +28,48 @@ templ Index() {
 		<div class="left">
 			<div>Status: <span id="status">pre-js</span></div>
 			<hr/>
-			// <button class="btn">check</button>
+			<div id="history"></div>
 		</div>
 		<div class="right">
 			<div id="results"></div>
 		</div>
 	</div>
+}
+
+templ HistoryBox(res []netcheck.RunResults) {
+	<table>
+		for _, v := range res {
+			<tr>
+				<td>{ v.StartedAt.Format(time.DateTime) }</td>
+				<td>
+					@resultsSummary(v.Results)
+				</td>
+			</tr>
+		}
+	</table>
+}
+
+templ resultsSummary(res []netcheck.EndpointResults) {
+	{{
+		retPos := 0
+		retNeg := 0
+		retInc := 0
+		for _, v := range res {
+			for _, v2 := range v.Results {
+				if v2.Success > 0 {
+					retPos++
+				} else if v2.Success < 0 {
+					retNeg++
+				} else {
+					retInc++
+				}
+			}
+		}
+	}}
+	{ len(res) }
+	(<span style="color: green">{ retPos }</span> /
+	<span style="color: gray">{ retInc }</span> /
+	<span style="color: red">{ retNeg }</span>)
 }
 
 templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Check) {
@@ -49,6 +86,23 @@ templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Chec
 					<th>{ check.Name }</th>
 				}
 			</tr>
+		</thead>
+		{{
+			greenByName := map[string]int{}
+			redByName := map[string]int{}
+			for _, endpoint := range endpoints {
+				for checkName, checkResult := range endpoint.Results {
+					if checkResult.Success > 0 {
+						greenByName[checkName] = greenByName[checkName] + 1
+					}
+					if checkResult.Success < 0 {
+						redByName[checkName] = redByName[checkName] + 1
+					}
+				}
+			}
+		}}
+		<thead>
+			@sumRow(greenByName, redByName, checks, len(endpoints))
 		</thead>
 		<tbody>
 			for i, endpoint := range endpoints {
@@ -73,31 +127,29 @@ templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Chec
 					}
 				</tr>
 			}
-			<tfoot>
-				<tr>
-					<th colspan="2">∑</th>
-					{{
-						greenByName := map[string]int{}
-						for _, endpoint := range endpoints {
-							for checkName, checkResult := range endpoint.Results {
-								if checkResult.Success > 0 {
-									greenByName[checkName] = greenByName[checkName] + 1
-								}
-							}
-						}
-					}}
-					for _, check := range checks {
-						<td>
-							<div><span style="color: green">{ greenByName[check.Name] }</span> / <span style="color: red">{ len(endpoints) - greenByName[check.Name] }</span></div>
-							<div>
-								{ fmt.Sprintf("%.0f", 100*float64(greenByName[check.Name])/float64(len(endpoints))) }%
-							</div>
-						</td>
-					}
-				</tr>
-			</tfoot>
 		</tbody>
+		<tfoot>
+			@sumRow(greenByName, redByName, checks, len(endpoints))
+		</tfoot>
 	</table>
+}
+
+templ sumRow(greens, reds map[string]int, checks []netcheck.Check, totalEndpoints int) {
+	<tr>
+		<th colspan="2">∑</th>
+		for _, check := range checks {
+			<td>
+				<div>
+					<span style="color: green">{ greens[check.Name] }</span> /
+					<span style="color: gray">{ totalEndpoints - reds[check.Name] - greens[check.Name] }</span> /
+					<span style="color: red">{ reds[check.Name] }</span>
+				</div>
+				<div>
+					{ fmt.Sprintf("%.0f", 100*(1-float64(reds[check.Name])/float64(totalEndpoints))) }%
+				</div>
+			</td>
+		}
+	</tr>
 }
 
 templ showCheckResult(res netcheck.CheckResult) {

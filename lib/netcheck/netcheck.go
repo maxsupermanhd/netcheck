@@ -98,7 +98,6 @@ func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
 			Brief:   o4[0],
 			Color:   "green",
 			Success: 1,
-			Content: string(o),
 		}
 	}
 	return CheckResult{
