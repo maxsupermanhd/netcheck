@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"main/frontend"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/rs/zerolog/log"
@@ -16,23 +19,28 @@ import (
 func handleWebsocket(ws *websocket.Conn) {
 	wsSendElem(ws, "span", "status", netChecker.GetState())
 	wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
-	wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get()))
+	wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), nil))
+	wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: live results`)
 	closeChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
 
 	updHistory := storedResults.Listen()
 	updResults := netChecker.ListenChan()
 
+	var clViewing atomic.Pointer[time.Time]
+
 	wg.Go(func() {
 		for {
 			select {
 			case <-updHistory:
 				updHistory = storedResults.Listen()
-				wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get()))
+				wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), clViewing.Load()))
 			case <-updResults:
 				updResults = netChecker.ListenChan()
 				wsSendElem(ws, "span", "status", netChecker.GetState())
-				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
+				if clViewing.Load() == nil {
+					wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
+				}
 			case <-closeChan:
 				return
 			}
@@ -46,7 +54,50 @@ func handleWebsocket(ws *websocket.Conn) {
 			wg.Wait()
 			return
 		}
-		log.Info().Msg(string(msgA.msg))
+		type ClientResp struct {
+			Action string `json:"action"`
+			Data   string `json:"data"`
+		}
+		var msg ClientResp
+		err = json.Unmarshal(msgA.msg, &msg)
+		if err != nil {
+			log.Err(err).Str("msg", string(msgA.msg)).Msg("client unmarshal")
+			close(closeChan)
+			wg.Wait()
+			return
+		}
+		switch msg.Action {
+		case "changeView":
+			clViewingLoaded := clViewing.Load()
+			if clViewingLoaded != nil && msg.Data == clViewingLoaded.Format(time.RFC3339) {
+				clViewing.Store(nil)
+				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
+				wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), nil))
+				wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: live results`)
+				break
+			}
+			found := false
+			for _, v := range storedResults.Get() {
+				if v.StartedAt.Round(0).Format(time.RFC3339) == msg.Data {
+					t := v.StartedAt
+					clViewing.Store(&t)
+					wsSendComp(ws, "div", "results", frontend.StatusesTable(v.Results, netChecks))
+					wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), &t))
+					wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: `+v.StartedAt.Format(time.DateTime))
+					found = true
+					break
+				}
+			}
+			if !found {
+				invalidHistoryEntry := time.Now()
+				clViewing.Store(&invalidHistoryEntry)
+				wsSendElem(ws, "div", "results", `erm`)
+			}
+		default:
+			close(closeChan)
+			wg.Wait()
+			return
+		}
 	}
 }
 

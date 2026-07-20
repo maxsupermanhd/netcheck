@@ -3,7 +3,7 @@ module main
 go 1.26.2
 
 require (
-	github.com/a-h/templ v0.3.1001
+	github.com/a-h/templ v0.3.1020
 	github.com/maxsupermanhd/go-flexutils v0.0.0-20260516211527-904038f0a13a
 	github.com/maxsupermanhd/lac/v2 v2.0.0-20250603135754-053986d885c5
 	github.com/rs/zerolog v1.35.1

@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"main/lib/netcheck"
+	"strconv"
 	"time"
 )
 
@@ -13,8 +14,8 @@ templ Page(content templ.Component) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0"/>
 			<link href="/static/style.css" rel="stylesheet"/>
-			<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
-			<script src="https://cdn.jsdelivr.net/npm/htmx-ext-ws@2.0.4" integrity="sha384-1RwI/nvUSrMRuNj7hX1+27J8XDdCoSLf0EjEyF69nacuWyiJYoQ/j39RT1mSnd2G" crossorigin="anonymous"></script>
+			<script src="/static/htmx-2.0.10/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"></script>
+			<script src="/static/htmx-ext-ws-2.0.4/htmx-ext-ws.min.js" integrity="sha384-1RwI/nvUSrMRuNj7hX1+27J8XDdCoSLf0EjEyF69nacuWyiJYoQ/j39RT1mSnd2G"></script>
 			<title>cheburnet?</title>
 		</head>
 		<body>
@@ -31,18 +32,39 @@ templ Index() {
 			<div id="history"></div>
 		</div>
 		<div class="right">
+			<div id="selectedViewIndicator"></div>
 			<div id="results"></div>
 		</div>
 	</div>
 }
 
-templ HistoryBox(res []netcheck.RunResults) {
-	<table>
+templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time) {
+	<table class="historyTable">
+		<colgroup>
+			<col span="1"/>
+			<col span="1" style="width: 100px;"/>
+			<col span="1"/>
+		</colgroup>
 		for _, v := range res {
 			<tr>
-				<td>{ v.StartedAt.Format(time.DateTime) }</td>
 				<td>
+					{ v.StartedAt.Format(time.DateTime) }
+				</td>
+				<td class="nowrap">
 					@resultsSummary(v.Results)
+				</td>
+				<td class="nowrap">
+					if currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
+						<form>
+							<input type="hidden" data-current-view name="data" value={v.StartedAt.Format(time.RFC3339)}/>
+							<button type="button" ws-send hx-get="action" name="action" value="changeView"><i>back</i></button>
+						</form>
+					} else {
+						<form>
+							<input type="hidden" name="data" value={v.StartedAt.Format(time.RFC3339)}/>
+							<button type="button" ws-send hx-get="action" name="action" value="changeView">show</button>
+						</form>
+					}
 				</td>
 			</tr>
 		}
@@ -65,11 +87,12 @@ templ resultsSummary(res []netcheck.EndpointResults) {
 				}
 			}
 		}
+		retTot := float64(retPos + retNeg + retInc)
+		prcPos := 100 * (float64(retPos) / float64(retTot))
+		prcNeg := 100 * (float64(retNeg) / float64(retTot))
+		prcInc := 100 * (float64(retInc) / float64(retTot))
 	}}
-	{ len(res) }
-	(<span style="color: green">{ retPos }</span> /
-	<span style="color: gray">{ retInc }</span> /
-	<span style="color: red">{ retNeg }</span>)
+	<span style={ "width: " + strconv.FormatFloat(prcPos, 'f', -1, 64) + "%" } class="barGreen"></span><span style={ "width: " + strconv.FormatFloat(prcNeg, 'f', -1, 64) + "%" } class="barRed"></span><span style={ "width: " + strconv.FormatFloat(prcInc, 'f', -1, 64) + "%" } class="barGray"></span>
 }
 
 templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Check) {
@@ -83,7 +106,11 @@ templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Chec
 				<th>#</th>
 				<th>endpoint</th>
 				for _, check := range checks {
-					<th>{ check.Name }</th>
+					if check.HeadStyle != "" {
+						<th style={check.HeadStyle}>{ check.Name }</th>
+					} else {
+						<th>{ check.Name }</th>
+					}
 				}
 			</tr>
 		</thead>

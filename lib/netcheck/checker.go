@@ -158,13 +158,14 @@ func (c *Checker) Run(ctx context.Context) {
 type CheckFunc func(context.Context, EndpointDescription) error
 
 type Check struct {
-	Name string
-	Fn   CheckFunc
+	Name      string
+	HeadStyle string
+	Fn        CheckFunc
 }
 
 var (
 	DefaultChecks = []Check{
-		{Name: "resolve", Fn: CheckEndpointResolve},
+		{Name: "resolve", Fn: CheckEndpointResolve, HeadStyle: "min-width: 180px"},
 		{Name: "ping", Fn: CheckEndpointPing},
 		{Name: "http", Fn: CheckEndpointPlainHTTP},
 		{Name: "tls12", Fn: CheckEndpointTLS12},
