@@ -1,6 +1,6 @@
 {
 	"netcheck": {
-		"initialPauseSeconds": 10,
+		"initialPauseSeconds": 2000000,
 		"checksIntervalSeconds": 60,
 		"staggerSleepMilliseconds": 200,
 		"checkTimeoutSeconds": 5
@@ -32,6 +32,7 @@
 			"Endpoint": "i.ytimg.com/vi/gsxrHVagelg/hq720.jpg"
 		},
 
+		"flathub.org/en",
 		"rutracker.org/forum/index.php",
 		"www.chess.com",
 		"discord.com",
