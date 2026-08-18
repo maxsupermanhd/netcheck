@@ -23,6 +23,12 @@
 		"lichess.org",
 		"simgbb.com/images/logo.png",
 
+		"ipinfo.io",
+		{
+			"Alias": "cdn.assets.ipinfo.io",
+			"Endpoint": "cdn.assets.ipinfo.io/static/deviceicons/android-icon-192x192.png"
+		},
+
 		"www.jsdelivr.com",
 		"cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js",
 
