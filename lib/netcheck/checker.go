@@ -169,6 +169,7 @@ var (
 		{Name: "ping", Fn: CheckEndpointPing},
 		{Name: "http", Fn: CheckEndpointPlainHTTP},
 		{Name: "tls12", Fn: CheckEndpointTLS12},
+		{Name: "tls13", Fn: CheckEndpointTLS13},
 		{Name: "tls13ech", Fn: CheckEndpointTLS13ECH},
 		{Name: "tls12h2", Fn: CheckEndpointTLS12HTTP2},
 		{Name: "tls13h2", Fn: CheckEndpointTLS13HTTP2},
