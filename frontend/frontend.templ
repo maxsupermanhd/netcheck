@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"main/lib/netcheck"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,13 +42,31 @@ templ Index() {
 	</div>
 }
 
-templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time) {
+templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time, currentView string) {
 	<table class="historyTable">
 		<colgroup>
 			<col span="1"/>
 			<col span="1" style="width: 100px;"/>
 			<col span="1"/>
 		</colgroup>
+		<tr>
+			<td colspan="3">
+				<div class="viewBtns">
+					<form>
+						<input type="hidden" name="data" value="live"/>
+						<button type="button" ws-send name="action" value="setView" class={ summaryBtnClass(currentView == "live") }>live</button>
+					</form>
+					<form>
+						<input type="hidden" name="data" value="history"/>
+						<button type="button" ws-send name="action" value="setView" class={ summaryBtnClass(currentView == "history") }>history</button>
+					</form>
+					<form>
+						<input type="hidden" name="data" value="summary"/>
+						<button type="button" ws-send name="action" value="setView" class={ summaryBtnClass(currentView == "summary") }>summary</button>
+					</form>
+				</div>
+			</td>
+		</tr>
 		for _, v := range res {
 			<tr>
 				<td>
@@ -57,15 +76,15 @@ templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time) {
 					@resultsSummary(v.Results)
 				</td>
 				<td class="nowrap">
-				if currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
+				if currentView == "history" && currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
 					<form>
-						<input type="hidden" name="data" value=""/>
-						<button type="button" ws-send hx-get="action" name="action" value="changeView"><i>back</i></button>
+						<input type="hidden" name="data" value="live"/>
+						<button type="button" ws-send name="action" value="setView"><i>back</i></button>
 					</form>
 				} else {
 						<form>
 							<input type="hidden" name="data" value={v.StartedAt.Format(time.RFC3339)}/>
-							<button type="button" ws-send hx-get="action" name="action" value="changeView">show</button>
+							<button type="button" ws-send name="action" value="selectRun">show</button>
 						</form>
 					}
 				</td>
@@ -196,4 +215,193 @@ templ showCheckResult(res netcheck.CheckResult) {
 	} else {
 		<span style={ st } title={ res.Content }>{ res.Brief }</span>
 	}
+}
+
+templ SummaryView(runs []netcheck.RunResults, checks []netcheck.Check) {
+	if len(runs) == 0 || len(checks) == 0 {
+		no results
+		{{ return }}
+	}
+	{{
+		// stored results are newest-first; show newest on the left, oldest on the right
+		ordered := make([]netcheck.RunResults, len(runs))
+		for i, v := range runs {
+			ordered[i] = v
+		}
+		// union of endpoints over all runs, in first-seen order
+		endpoints := []netcheck.EndpointDescription{}
+		seen := map[string]bool{}
+		for _, run := range ordered {
+			for _, er := range run.Results {
+				k := er.Endpoint.Endpoint
+				if !seen[k] {
+					seen[k] = true
+					endpoints = append(endpoints, er.Endpoint)
+				}
+			}
+		}
+		// per endpoint x run: index into a unique color-sequence table, plus title
+		n := len(checks)
+		idxs := make([][]int, len(endpoints))
+		titles := make([][]string, len(endpoints))
+		for e := range idxs {
+			idxs[e] = make([]int, len(ordered))
+			titles[e] = make([]string, len(ordered))
+		}
+		seqIndex := map[string]int{}
+		uniqueSeqs := [][]string{}
+		for r, run := range ordered {
+			m := map[string]netcheck.EndpointResults{}
+			for _, er := range run.Results {
+				m[er.Endpoint.Endpoint] = er
+			}
+			for e, ep := range endpoints {
+				er, ok := m[ep.Endpoint]
+				if !ok {
+					idxs[e][r] = -1
+					titles[e][r] = ep.Endpoint + " @ " + run.StartedAt.Format(time.DateTime) + "\n(no data)"
+					continue
+				}
+				seq := colorsForEndpoint(er, checks)
+				k := strings.Join(seq, "|")
+				ii, ok2 := seqIndex[k]
+				if !ok2 {
+					ii = len(uniqueSeqs)
+					seqIndex[k] = ii
+					uniqueSeqs = append(uniqueSeqs, seq)
+				}
+				idxs[e][r] = ii
+				var sb strings.Builder
+				sb.WriteString(ep.Endpoint)
+				sb.WriteString(" @ ")
+				sb.WriteString(run.StartedAt.Format(time.DateTime))
+				sb.WriteString("\n")
+				for _, ch := range checks {
+					sb.WriteString(ch.Name)
+					sb.WriteString(" ")
+					if res, ok3 := er.Results[ch.Name]; ok3 {
+						sb.WriteString(statusWord(res))
+						if res.Brief != "" {
+							sb.WriteString(" ")
+							sb.WriteString(res.Brief)
+						}
+					} else {
+						sb.WriteString("-")
+					}
+					sb.WriteString("\n")
+				}
+				titles[e][r] = sb.String()
+			}
+		}
+		// merge consecutive runs with an identical grid into segments: lossless,
+		// because within a segment every endpoint keeps the same sequence.
+		segStarts := []int{0}
+		for r := 1; r < len(ordered); r++ {
+			changed := false
+			for e := range endpoints {
+				if idxs[e][r] != idxs[e][r-1] {
+					changed = true
+					break
+				}
+			}
+			if changed {
+				segStarts = append(segStarts, r)
+			}
+		}
+		// collect the distinct colors so each is defined only once as a var
+		colorVar := map[string]string{}
+		var uniqueColors []string
+		for _, seq := range uniqueSeqs {
+			for _, c := range seq {
+				if _, ok := colorVar[c]; !ok {
+					colorVar[c] = "--c" + strconv.Itoa(len(uniqueColors))
+					uniqueColors = append(uniqueColors, c)
+				}
+			}
+		}
+		// one <style> block: distinct colors as --cN vars on .summaryCell, a single
+		// base gradient that reads --sN vars, and one small rule per unique color
+		// sequence mapping --sN to the relevant --cN.
+		var styleBuf strings.Builder
+		styleBuf.WriteString("<style>[data-sg]{")
+		for i, c := range uniqueColors {
+			styleBuf.WriteString(fmt.Sprintf("--c%d:%s;", i, c))
+		}
+		styleBuf.WriteString("background-image:linear-gradient(to bottom")
+		step := 100.0 / float64(n)
+		for i := 0; i < n; i++ {
+			start := step * float64(i)
+			end := step * float64(i+1)
+			styleBuf.WriteString(fmt.Sprintf(",var(--s%d) %.2f%% %.2f%%", i, start, end))
+		}
+		styleBuf.WriteString(")}")
+		for i, seq := range uniqueSeqs {
+			styleBuf.WriteString(fmt.Sprintf("[data-sg='%d']{", i))
+			for j, c := range seq {
+				styleBuf.WriteString(fmt.Sprintf("--s%d:var(%s);", j, colorVar[c]))
+			}
+			styleBuf.WriteString("}")
+		}
+		styleBuf.WriteString("</style>")
+		styleRaw := templ.Raw(styleBuf.String())
+	}}
+	<div class="summaryScroll">
+		@styleRaw
+		<table class="summaryTable">
+			<thead>
+				<tr>
+					<th class="summaryNum"></th>
+					<th class="summaryLabel"></th>
+					<th class="summaryDir" colspan={ strconv.Itoa(len(segStarts)) }>← newer · older →</th>
+				</tr>
+				<tr>
+					<th class="summaryNum">#</th>
+					<th class="summaryLabel">endpoint</th>
+					for si, s := range segStarts {
+						{{
+							en := s
+							if si+1 < len(segStarts) {
+								en = segStarts[si+1] - 1
+							} else {
+								en = len(ordered) - 1
+							}
+							span := en - s + 1
+							startT := ordered[s].StartedAt
+							endT := ordered[en].StartedAt
+							htitle := startT.Format(time.RFC3339)
+							if span > 1 {
+								htitle = htitle + " .. " + endT.Format(time.RFC3339) + " (" + strconv.Itoa(span) + " samples)"
+							}
+						}}
+						<th class="summaryHead" colspan={ strconv.Itoa(span) } title={ htitle }>{ startT.Format("15:04") }</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				for ei, ep := range endpoints {
+					<tr>
+						<td class="summaryNum">{ strconv.Itoa(ei + 1) }</td>
+						<td class="summaryLabel" title={ ep.Endpoint }>{ labelFor(ep) }</td>
+						for si, s := range segStarts {
+							{{
+								en := s
+								if si+1 < len(segStarts) {
+									en = segStarts[si+1] - 1
+								} else {
+									en = len(ordered) - 1
+								}
+								span := en - s + 1
+								idx := idxs[ei][s]
+							}}
+							if idx >= 0 {
+								<td colspan={ strconv.Itoa(span) } data-sg={ strconv.Itoa(idx) } title={ titles[ei][s] }></td>
+							} else {
+								<td class="summaryEmpty" colspan={ strconv.Itoa(span) } title={ titles[ei][s] }></td>
+							}
+						}
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
 }
