@@ -11,6 +11,10 @@
 	},
 	"endpoints": [
 		"vk.com",
+		"www.mos.ru",
+		"www.gosuslugi.ru",
+		"max.ru",
+
 		"crypto.cloudflare.com/cdn-cgi/trace",
 		"cloudflare.com/cdn-cgi/trace",
 		"developer.mozilla.org/en-US/",
@@ -56,6 +60,7 @@
 			"Endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2"
 		},
 		"onlywands.com/streamer/DunkOrSlam",
+		"onlywands.com/spellData.js",
 
 		"telegram.org",
 		"x.com",
@@ -69,6 +74,8 @@
 		"xdaforums.com",
 		"vdo.ninja",
 		"seedcrack.com",
+		"nanachi.party/testpage",
+		"meteorclient.com",
 
 		"mangadex.org",
 
