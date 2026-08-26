@@ -26,6 +26,9 @@ templ Page(content templ.Component) {
 
 templ Index() {
 	<div class="mainbox" hx-ext="ws" ws-connect="/ws">
+		<form id="client-state" ws-send hx-trigger="htmx:wsOpen from:body" hx-swap="none">
+			<input type="hidden" id="state-viewing" name="viewing" value=""/>
+		</form>
 		<div class="left">
 			<div>Status: <span id="status">pre-js</span></div>
 			<hr/>
@@ -54,12 +57,12 @@ templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time) {
 					@resultsSummary(v.Results)
 				</td>
 				<td class="nowrap">
-					if currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
-						<form>
-							<input type="hidden" data-current-view name="data" value={v.StartedAt.Format(time.RFC3339)}/>
-							<button type="button" ws-send hx-get="action" name="action" value="changeView"><i>back</i></button>
-						</form>
-					} else {
+				if currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
+					<form>
+						<input type="hidden" name="data" value=""/>
+						<button type="button" ws-send hx-get="action" name="action" value="changeView"><i>back</i></button>
+					</form>
+				} else {
 						<form>
 							<input type="hidden" name="data" value={v.StartedAt.Format(time.RFC3339)}/>
 							<button type="button" ws-send hx-get="action" name="action" value="changeView">show</button>

@@ -54,11 +54,7 @@ func handleWebsocket(ws *websocket.Conn) {
 			wg.Wait()
 			return
 		}
-		type ClientResp struct {
-			Action string `json:"action"`
-			Data   string `json:"data"`
-		}
-		var msg ClientResp
+		var msg wsClientMessage
 		err = json.Unmarshal(msgA.msg, &msg)
 		if err != nil {
 			log.Err(err).Str("msg", string(msgA.msg)).Msg("client unmarshal")
@@ -66,39 +62,68 @@ func handleWebsocket(ws *websocket.Conn) {
 			wg.Wait()
 			return
 		}
-		switch msg.Action {
-		case "changeView":
-			clViewingLoaded := clViewing.Load()
-			if clViewingLoaded != nil && msg.Data == clViewingLoaded.Format(time.RFC3339) {
-				clViewing.Store(nil)
-				wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
-				wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), nil))
-				wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: live results`)
-				break
-			}
-			found := false
-			for _, v := range storedResults.Get() {
-				if v.StartedAt.Round(0).Format(time.RFC3339) == msg.Data {
-					t := v.StartedAt
-					clViewing.Store(&t)
-					wsSendComp(ws, "div", "results", frontend.StatusesTable(v.Results, netChecks))
-					wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), &t))
-					wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: `+v.StartedAt.Format(time.DateTime))
-					found = true
-					break
-				}
-			}
-			if !found {
-				invalidHistoryEntry := time.Now()
-				clViewing.Store(&invalidHistoryEntry)
-				wsSendElem(ws, "div", "results", `erm`)
-			}
+		switch {
+		case msg.Action == "changeView":
+			applyViewing(ws, msg.Data, &clViewing)
+		case msg.Action == "":
+			applyViewing(ws, msg.Viewing, &clViewing)
 		default:
 			close(closeChan)
 			wg.Wait()
 			return
 		}
 	}
+}
+
+type wsClientMessage struct {
+	Action  string            `json:"action"`
+	Data    string            `json:"data"`
+	Viewing string            `json:"viewing"`
+	HEADERS map[string]string `json:"HEADERS"`
+}
+
+func applyViewing(ws *websocket.Conn, ts string, clViewing *atomic.Pointer[time.Time]) {
+	if ts == "" {
+		clViewing.Store(nil)
+		wsSendComp(ws, "div", "results", frontend.StatusesTable(netChecker.GetResults(), netChecks))
+		wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), nil))
+		wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: live results`)
+		wsSendClientViewing(ws, "")
+		return
+	}
+	for _, v := range storedResults.Get() {
+		if v.StartedAt.Round(0).Format(time.RFC3339) == ts {
+			t := v.StartedAt
+			clViewing.Store(&t)
+			wsSendComp(ws, "div", "results", frontend.StatusesTable(v.Results, netChecks))
+			wsSendComp(ws, "div", "history", frontend.HistoryBox(storedResults.Get(), &t))
+			wsSendElem(ws, "div", "selectedViewIndicator", `Viewing: `+v.StartedAt.Format(time.DateTime))
+			wsSendClientViewing(ws, ts)
+			return
+		}
+	}
+	clViewing.Store(nil)
+	wsSendElem(ws, "div", "results", `erm`)
+	wsSendClientViewing(ws, "")
+}
+
+func wsSendClientViewing(ws *websocket.Conn, ts string) error {
+	fw, err := ws.NewFrameWriter(websocket.TextFrame)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(fw, `<input type="hidden" id="state-viewing" name="viewing" value="%s" hx-swap-oob="true">`,
+		htmlAttr(ts))
+	return fw.Close()
+}
+
+func htmlAttr(s string) string {
+	return strings.NewReplacer(
+		`&`, "&amp;",
+		`"`, "&quot;",
+		`<`, "&lt;",
+		`>`, "&gt;",
+	).Replace(s)
 }
 
 func wsSendElem(ws *websocket.Conn, elem, id, content string) error {
