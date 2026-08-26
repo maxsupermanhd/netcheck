@@ -149,6 +149,32 @@ func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
 	return checkReq(cl, req)
 }
 
+func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) error {
+	cl := &http.Client{
+		Transport: &http.Transport{
+			ReadBufferSize: 1,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				MaxVersion: tls.VersionTLS12,
+			},
+			DisableKeepAlives:  true,
+			DisableCompression: false,
+			TLSNextProto:       nil,
+			ForceAttemptHTTP2:  true,
+			HTTP2:              nil,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("new req: %w", err)
+	}
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
+	return checkReq(cl, req)
+}
+
 func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 	cl := &http.Client{
 		Transport: &http.Transport{
@@ -161,6 +187,32 @@ func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 			DisableCompression: false,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
+			HTTP2:              nil,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("new req: %w", err)
+	}
+	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
+	return checkReq(cl, req)
+}
+
+func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) error {
+	cl := &http.Client{
+		Transport: &http.Transport{
+			ReadBufferSize: 1,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS13,
+				MaxVersion: tls.VersionTLS13,
+			},
+			DisableKeepAlives:  true,
+			DisableCompression: false,
+			TLSNextProto:       nil,
+			ForceAttemptHTTP2:  true,
 			HTTP2:              nil,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
