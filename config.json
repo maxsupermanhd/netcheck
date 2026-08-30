@@ -1,8 +1,11 @@
 {
+	"http": {
+    "listenAddr": "0.0.0.0:40125"
+  },
 	"netcheck": {
-		"initialPauseSeconds": 60,
-		"checksIntervalSeconds": 60,
-		"staggerSleepMilliseconds": 200,
+		"initialPauseSeconds": 10,
+		"checksIntervalSeconds": 900,
+		"staggerSleepMilliseconds": 1000,
 		"checkTimeoutSeconds": 5
 	},
 	"results": {
