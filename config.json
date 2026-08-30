@@ -1,13 +1,13 @@
 {
 	"netcheck": {
-		"initialPauseSeconds": 2000000,
+		"initialPauseSeconds": 60,
 		"checksIntervalSeconds": 60,
 		"staggerSleepMilliseconds": 200,
 		"checkTimeoutSeconds": 5
 	},
 	"results": {
 		"path": "results.json",
-		"limit": 100
+		"limit": 300
 	},
 	"endpoints": [
 		"vk.com",
