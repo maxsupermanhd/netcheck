@@ -119,8 +119,7 @@ func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
@@ -132,7 +131,7 @@ func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
 				MaxVersion: tls.VersionTLS12,
 			},
 			DisableKeepAlives:  true,
-			DisableCompression: false,
+			DisableCompression: true,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
@@ -145,8 +144,7 @@ func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) error {
@@ -158,7 +156,7 @@ func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) erro
 				MaxVersion: tls.VersionTLS12,
 			},
 			DisableKeepAlives:  true,
-			DisableCompression: false,
+			DisableCompression: true,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  true,
 			HTTP2:              nil,
@@ -171,8 +169,7 @@ func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) erro
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
@@ -184,7 +181,7 @@ func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 				MaxVersion: tls.VersionTLS13,
 			},
 			DisableKeepAlives:  true,
-			DisableCompression: false,
+			DisableCompression: true,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
@@ -197,8 +194,7 @@ func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) error {
@@ -210,7 +206,7 @@ func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) erro
 				MaxVersion: tls.VersionTLS13,
 			},
 			DisableKeepAlives:  true,
-			DisableCompression: false,
+			DisableCompression: true,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  true,
 			HTTP2:              nil,
@@ -223,8 +219,7 @@ func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) erro
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error {
@@ -240,7 +235,7 @@ func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error 
 			ReadBufferSize:     1,
 			TLSClientConfig:    tlsConfig,
 			DisableKeepAlives:  true,
-			DisableCompression: false,
+			DisableCompression: true,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
@@ -277,11 +272,15 @@ func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error 
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
-	return checkReq(cl, req)
+	return CheckReq(cl, req, desc)
 }
 
-func checkReq(cl *http.Client, req *http.Request) error {
+func CheckReq(cl *http.Client, req *http.Request, desc EndpointDescription) error {
+	if desc.UserAgent != "" {
+		req.Header.Set("User-Agent", desc.UserAgent) //"Mozilla/5.0 (Android 16; Mobile; rv:154.0) Gecko/154.0 Firefox/154.0")
+	} else {
+		req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
+	}
 	rsp, err := cl.Do(req)
 	if err != nil {
 		return fmt.Errorf("req do: %w", err)
@@ -294,10 +293,26 @@ func checkReq(cl *http.Client, req *http.Request) error {
 			Content: "redirects to: " + rsp.Header.Get("Location"),
 		}
 	}
+	if rsp.StatusCode != 200 {
+		return CheckResult{
+			Brief:   strconv.Itoa(rsp.StatusCode),
+			Color:   "yellow",
+			Success: 0,
+		}
+	}
 	body := iocount.NewCounterReader(rsp.Body)
+	defer rsp.Body.Close()
 	_, err = io.ReadAll(body)
 	if err != nil {
 		return ErrPartialRead{err: err, got: int(body.Count), need: int(rsp.ContentLength)}
+	}
+	if body.Count < 50_000 && !desc.SmallResponse {
+		return CheckResult{
+			Brief:   "SMALL",
+			Color:   "yellow",
+			Success: 0,
+			Content: "Response too small: " + strconv.Itoa(int(body.Count)) + " bytes",
+		}
 	}
 	return nil
 }

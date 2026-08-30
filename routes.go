@@ -19,7 +19,7 @@ func makeHTTPServeMux() http.HandlerFunc {
 
 	mux.HandleFunc("GET /ws", websocket.Server{Handler: handleWebsocket}.ServeHTTP)
 
-	mux.HandleFunc("GET /testpage", serveTestpage)
+	mux.HandleFunc("GET /testpage", httpLog(serveTestpage))
 
 	return mux.ServeHTTP
 }

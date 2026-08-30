@@ -18,6 +18,9 @@ templ Page(content templ.Component) {
 			<script src="/static/htmx-2.0.10/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"></script>
 			<script src="/static/htmx-ext-ws-2.0.4/htmx-ext-ws.min.js" integrity="sha384-1RwI/nvUSrMRuNj7hX1+27J8XDdCoSLf0EjEyF69nacuWyiJYoQ/j39RT1mSnd2G"></script>
 			<title>cheburnet?</title>
+			<script>
+				htmx.config.wsReconnectDelay = function (retryCount) { return 8000 }
+			</script>
 		</head>
 		<body>
 			@content
@@ -76,14 +79,14 @@ templ HistoryBox(res []netcheck.RunResults, currentViewing *time.Time, currentVi
 					@resultsSummary(v.Results)
 				</td>
 				<td class="nowrap">
-				if currentView == "history" && currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
-					<form>
-						<input type="hidden" name="data" value="live"/>
-						<button type="button" ws-send name="action" value="setView"><i>back</i></button>
-					</form>
-				} else {
+					if currentView == "history" && currentViewing != nil && v.StartedAt.Equal(*currentViewing) {
 						<form>
-							<input type="hidden" name="data" value={v.StartedAt.Format(time.RFC3339)}/>
+							<input type="hidden" name="data" value="live"/>
+							<button type="button" ws-send name="action" value="setView"><i>back</i></button>
+						</form>
+					} else {
+						<form>
+							<input type="hidden" name="data" value={ v.StartedAt.Format(time.RFC3339) }/>
 							<button type="button" ws-send name="action" value="selectRun">show</button>
 						</form>
 					}
@@ -129,7 +132,7 @@ templ StatusesTable(endpoints []netcheck.EndpointResults, checks []netcheck.Chec
 				<th>endpoint</th>
 				for _, check := range checks {
 					if check.HeadStyle != "" {
-						<th style={check.HeadStyle}>{ check.Name }</th>
+						<th style={ check.HeadStyle }>{ check.Name }</th>
 					} else {
 						<th>{ check.Name }</th>
 					}

@@ -19,6 +19,7 @@ func httpRoutine(ctx context.Context) {
 	serv := http.Server{
 		Addr:    listenAddr,
 		Handler: makeHTTPServeMux(),
+		HTTP2:   &http.HTTP2Config{},
 	}
 
 	wg := &sync.WaitGroup{}

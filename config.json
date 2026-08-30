@@ -1,9 +1,9 @@
 {
 	"http": {
-    "listenAddr": "0.0.0.0:40125"
-  },
+		"listenAddr": "0.0.0.0:40125"
+	},
 	"netcheck": {
-		"initialPauseSeconds": 10,
+		"initialPauseSeconds": 60,
 		"checksIntervalSeconds": 900,
 		"staggerSleepMilliseconds": 1000,
 		"checkTimeoutSeconds": 5
@@ -14,85 +14,168 @@
 	},
 	"endpoints": [
 		"vk.com",
-		"www.mos.ru",
-		"www.gosuslugi.ru",
-		"max.ru",
+		{
+			"alias": "mos.ru",
+			"endpoint": "www.mos.ru"
+		},
+		{
+			"alias": "gosuslugi.ru",
+			"endpoint": "www.gosuslugi.ru"
+		},
+		{
+			"alias": "max.ru",
+			"endpoint": "max.ru/s/img/big-logo.png"
+		},
 
-		"crypto.cloudflare.com/cdn-cgi/trace",
-		"cloudflare.com/cdn-cgi/trace",
+		{
+			"endpoint": "crypto.cloudflare.com/cdn-cgi/trace",
+			"smallResponse": true
+		},
+		{
+			"endpoint": "cloudflare.com/cdn-cgi/trace",
+			"smallResponse": true
+		},
 		"developer.mozilla.org/en-US/",
-		"www.google.com",
+		{ "alias": "google.com", "endpoint": "www.google.com" },
 
 		"github.com",
 		"go.dev",
-		"pkg.go.dev",
-		"www.twitch.tv",
-		"lichess.org",
-		"simgbb.com/images/logo.png",
-
-		"ipinfo.io",
 		{
-			"Alias": "cdn.assets.ipinfo.io",
-			"Endpoint": "cdn.assets.ipinfo.io/static/deviceicons/android-icon-192x192.png"
+			"alias": "pkg.go.dev",
+			"endpoint": "pkg.go.dev/github.com/maxsupermanhd/lac"
+		},
+		{
+			"alias": "twitch.tv",
+			"endpoint": "www.twitch.tv"
+		},
+		{
+			"alias": "lichess.org",
+			"endpoint": "lichess.org/patron"
+		},
+		{
+			"endpoint": "imgbb.com",
+			"smallResponse": true
 		},
 
-		"www.jsdelivr.com",
-		"cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js",
-
-		"www.youtube.com",
 		{
-			"Alias": "i.ytimg.com",
-			"Endpoint": "i.ytimg.com/vi/gsxrHVagelg/hq720.jpg"
+			"alias": "ipinfo.io",
+			"endpoint": "ipinfo.io/what-is-my-ip",
+			"userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0"
+		},
+
+		{
+			"alias": "jsdelivr.com",
+			"endpoint": "www.jsdelivr.com/blog/rss/"
+		},
+		{
+			"alias": "cdn.jsdelivr.net",
+			"endpoint": "cdn.jsdelivr.net/gh/jquery/jquery@4.0.0/dist/jquery.min.js"
+		},
+
+		{
+			"alias": "youtube.com",
+			"endpoint": "www.youtube.com"
+		},
+		{
+			"endpoint": "m.youtube.com",
+			"userAgent": "Mozilla/5.0 (Android 16; Mobile; rv:154.0) Gecko/154.0 Firefox/154.0"
+		},
+		{
+			"alias": "i.ytimg.com",
+			"endpoint": "i.ytimg.com/vi/gsxrHVagelg/hq720.jpg"
 		},
 
 		"flathub.org/en",
-		"dl.flathub.org/repo/summary.idx",
+		{
+			"endpoint": "dl.flathub.org/repo/summary.idx",
+			"smallResponse": true
+		},
+		{
+			"alias": "dl.flathub.org/repo/summaries/...",
+			"endpoint": "dl.flathub.org/repo/summaries/3433fc9a6f393d470ea11a47ef677a13119ca56bdbe8d2ab7f6abccb02339ca4.gz"
+		},
+
 		"rutracker.org/forum/index.php",
-		"www.chess.com",
+		{
+			"alias": "chess.com",
+			"endpoint": "www.chess.com"
+		},
 		"discord.com",
+
 		{
-			"Alias": "cdn.discordapp.com decoration",
-			"Endpoint": "cdn.discordapp.com/media/v1/collectibles-shop/1409898407769673900/static"
+			"alias": "cdn.discordapp.com",
+			"endpoint": "cdn.discordapp.com/media/v1/collectibles-shop/1409898407769673900/static"
 		},
-		"www.protondb.com",
-		"www.wiki.gg",
+
+		{
+			"alias": "protondb.com",
+			"endpoint": "www.protondb.com/data/reports/all-devices/app/497164833.json"
+		},
+		{
+			"alias": "wiki.gg",
+			"endpoint": "www.wiki.gg"
+		},
 		"store.steampowered.com",
-		"steamcommunity.com",
 		{
-			"Alias": "store.fastly.steamstatic.com banner",
-			"Endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2"
+			"alias": "steamcommunity.com",
+			"endpoint": "steamcommunity.com/apps/allcontenthome?l=english&browsefilter=trend&appHubSubSection=10&forceanon=1"
 		},
-		"onlywands.com/streamer/DunkOrSlam",
+		{
+			"alias": "store.fastly.steamstatic.com",
+			"endpoint": "store.fastly.steamstatic.com/public/images/v6/colored_body_top.png?v=2"
+		},
+
 		"onlywands.com/spellData.js",
 		"dunkbin.com/backpack/473064207",
 
 		"telegram.org",
-		"x.com",
-		"www.instagram.com",
+		{
+			"alias": "x.com",
+			"endpoint": "x.com/apple-touch-icon.png"
+		},
+		{
+			"alias": "instagram.com",
+			"endpoint": "www.instagram.com"
+		},
 
 		"consumerrights.wiki/w/Main_Page",
 		"cyberchef.org",
 		"compute.toys",
 		"ntc.party",
-		"stackoverflow.com/questions",
+		"stackoverflow.co",
 		"xdaforums.com",
 		"vdo.ninja",
-		"seedcrack.com",
+		{
+			"alias": "seedcrack.com",
+			"endpoint": "seedcrack.com/guide/f3_new.png"
+		},
 		"nanachi.party/testpage",
-		"meteorclient.com",
+		{
+			"alias": "meteorclient.com",
+			"endpoint": "meteorclient.com/icon.png"
+		},
 
-		"mangadex.org",
+		{
+			"alias": "mangadex.org",
+			"endpoint": "mangadex.org/covers/80422e14-b9ad-4fda-970f-de370d5fa4e5/a9c2d5fa-6c12-434b-ab80-630e6d862cf8.jpg.512.jpg"
+		},
 
 		"7tv.app",
 		{
-			"Alias": "7tv.io",
-			"Endpoint": "7tv.io/v3/emote-sets/global"
+			"alias": "7tv.io",
+			"endpoint": "7tv.io/v3/emote-sets/global"
 		},
-		"betterttv.com",
 		{
-			"Alias": "cdn.betterttv.net",
-			"Endpoint": "cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/1x.webp"
+			"endpoint": "betterttv.com",
+			"smallResponse": true
 		},
-		"www.frankerfacez.com"
+		{
+			"alias": "cdn.betterttv.net",
+			"endpoint": "cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/1x.webp"
+		},
+		{
+			"alias": "frankerfacez.com",
+			"endpoint": "www.frankerfacez.com"
+		}
 	]
 }

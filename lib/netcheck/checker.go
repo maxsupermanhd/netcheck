@@ -13,21 +13,23 @@ import (
 )
 
 type EndpointDescription struct {
-	Alias    string `json:",omitempty"`
-	Endpoint string
+	Alias         string `json:"alias,omitempty"`
+	Endpoint      string `json:"endpoint,omitempty"`
+	SmallResponse bool   `json:"smallResponse,omitempty"`
+	UserAgent     string `json:"userAgent,omitempty"`
 }
 
 type CheckResult struct {
-	Brief     string `json:",omitempty"`
-	BriefHTML string `json:",omitempty"`
-	Color     string `json:",omitempty"`
+	Brief     string `json:"brief,omitempty"`
+	BriefHTML string `json:"briefHTML,omitempty"`
+	Color     string `json:"color,omitempty"`
 
 	// usually filled outside of the checker
-	Took    time.Duration `json:",omitempty"`
-	Content string        `json:",omitempty"`
+	Took    time.Duration `json:"took,omitempty"`
+	Content string        `json:"content,omitempty"`
 
 	// 0 inconclusive >0 positive <0 negative
-	Success int `json:",omitempty"`
+	Success int `json:"success,omitempty"`
 }
 
 func (e CheckResult) Error() string {
@@ -48,14 +50,14 @@ func (e CheckResult) Is(target error) bool {
 }
 
 type RunResults struct {
-	StartedAt time.Time
-	Duration  time.Duration
-	Results   []EndpointResults
+	StartedAt time.Time         `json:"startedAt"`
+	Duration  time.Duration     `json:"duration"`
+	Results   []EndpointResults `json:"results"`
 }
 
 type EndpointResults struct {
-	Endpoint EndpointDescription
-	Results  map[string]CheckResult
+	Endpoint EndpointDescription    `json:"endpoint"`
+	Results  map[string]CheckResult `json:"results"`
 }
 
 func (e EndpointResults) Clone() EndpointResults {

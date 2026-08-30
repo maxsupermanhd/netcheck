@@ -71,10 +71,10 @@ func getConfigEndpoints() []netcheck.EndpointDescription {
 			})
 		case map[string]any:
 			ed := netcheck.EndpointDescription{}
-			var ok bool
-			ed.Endpoint, ok = ee["Endpoint"].(string)
-			ed.Alias, ok = ee["Alias"].(string)
-			_ = ok
+			ed.Endpoint, _ = ee["endpoint"].(string)
+			ed.Alias, _ = ee["alias"].(string)
+			ed.UserAgent, _ = ee["userAgent"].(string)
+			ed.SmallResponse, _ = ee["smallResponse"].(bool)
 			ret = append(ret, ed)
 		}
 	}
