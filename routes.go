@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"main/frontend"
 	"net/http"
 
@@ -18,5 +19,12 @@ func makeHTTPServeMux() http.HandlerFunc {
 
 	mux.HandleFunc("GET /ws", websocket.Server{Handler: handleWebsocket}.ServeHTTP)
 
+	mux.HandleFunc("GET /testpage", serveTestpage)
+
 	return mux.ServeHTTP
+}
+
+func serveTestpage(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+	w.Write(bytes.Repeat([]byte{'f'}, 500_000))
 }
