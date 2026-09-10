@@ -37,8 +37,12 @@ func main() {
 			Compress: true,
 		}))
 	resultsStoragePath := cfg.GetDString("results.json", "results", "path")
+	resultsSaveFunc := func(res netcheck.RunResults) {
+		storedResults.Add(res)
+		log.Err(saveJson(resultsStoragePath, storedResults.Get())).Msg("results saved")
+	}
 	storedResults = netcheck.NewResultsStorage(noerr(loadJsonIfExists[[]netcheck.RunResults](resultsStoragePath)), cfg.GetDInt(50, "results", "limit"))
-	netChecker = netcheck.NewChecker(log.Logger, cfg.DupSubTree("netcheck"), getConfigEndpoints(), netChecks, storedResults.Add)
+	netChecker = netcheck.NewChecker(log.Logger, cfg.DupSubTree("netcheck"), getConfigEndpoints(), netChecks, resultsSaveFunc)
 
 	stopHttp := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "http", httpRoutine)
 	stopChecker := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "checker", netChecker.Run)
@@ -51,8 +55,6 @@ func main() {
 
 	stopChecker()
 	stopHttp()
-
-	log.Err(saveJson(resultsStoragePath, storedResults.Get())).Msg("results stored")
 
 	log.Info().Msg("bye")
 }
