@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -110,7 +111,11 @@ func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
 
 func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error {
 	cl := &http.Client{
-		Transport: http.DefaultTransport,
+		Transport: &http.Transport{
+			DisableKeepAlives:  true,
+			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
+		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -132,6 +137,7 @@ func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
 			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
@@ -157,6 +163,7 @@ func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) erro
 			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  true,
 			HTTP2:              nil,
@@ -182,6 +189,7 @@ func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
 			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
@@ -207,6 +215,7 @@ func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) erro
 			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  true,
 			HTTP2:              nil,
@@ -236,6 +245,7 @@ func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error 
 			TLSClientConfig:    tlsConfig,
 			DisableKeepAlives:  true,
 			DisableCompression: true,
+			IdleConnTimeout:    time.Millisecond,
 			TLSNextProto:       nil,
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
