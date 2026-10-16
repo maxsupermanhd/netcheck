@@ -109,124 +109,74 @@ func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
 	}
 }
 
-func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error {
+func NewDefaultRequest(ctx context.Context, desc EndpointDescription, proto string, tlsVer uint16, protos *http.Protocols) (*http.Client, *http.Request, error) {
+	if protos == nil {
+		protos = &http.Protocols{}
+		protos.SetHTTP1(true)
+	}
 	cl := &http.Client{
 		Transport: &http.Transport{
+			ReadBufferSize: 1,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tlsVer,
+				MaxVersion: tlsVer,
+			},
 			DisableKeepAlives:  true,
 			DisableCompression: true,
 			IdleConnTimeout:    time.Millisecond,
+			Protocols:          protos,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+desc.Endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", proto+"://"+desc.Endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("new req: %w", err)
+		return nil, nil, fmt.Errorf("new req: %w", err)
+	}
+	return cl, req, nil
+}
+
+func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error {
+	cl, req, err := NewDefaultRequest(ctx, desc, "http", 0, nil)
+	if err != nil {
+		return err
 	}
 	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
-	cl := &http.Client{
-		Transport: &http.Transport{
-			ReadBufferSize: 1,
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS12,
-				MaxVersion: tls.VersionTLS12,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			IdleConnTimeout:    time.Millisecond,
-			TLSNextProto:       nil,
-			ForceAttemptHTTP2:  false,
-			HTTP2:              nil,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS12, nil)
 	if err != nil {
-		return fmt.Errorf("new req: %w", err)
+		return err
 	}
 	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) error {
-	cl := &http.Client{
-		Transport: &http.Transport{
-			ReadBufferSize: 1,
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS12,
-				MaxVersion: tls.VersionTLS12,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			IdleConnTimeout:    time.Millisecond,
-			TLSNextProto:       nil,
-			ForceAttemptHTTP2:  true,
-			HTTP2:              nil,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	protos := &http.Protocols{}
+	protos.SetHTTP2(true)
+	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS12, protos)
 	if err != nil {
-		return fmt.Errorf("new req: %w", err)
+		return err
 	}
 	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
-	cl := &http.Client{
-		Transport: &http.Transport{
-			ReadBufferSize: 1,
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS13,
-				MaxVersion: tls.VersionTLS13,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			IdleConnTimeout:    time.Millisecond,
-			TLSNextProto:       nil,
-			ForceAttemptHTTP2:  false,
-			HTTP2:              nil,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS13, nil)
 	if err != nil {
-		return fmt.Errorf("new req: %w", err)
+		return err
 	}
 	return CheckReq(cl, req, desc)
 }
 
 func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) error {
-	cl := &http.Client{
-		Transport: &http.Transport{
-			ReadBufferSize: 1,
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS13,
-				MaxVersion: tls.VersionTLS13,
-			},
-			DisableKeepAlives:  true,
-			DisableCompression: true,
-			IdleConnTimeout:    time.Millisecond,
-			TLSNextProto:       nil,
-			ForceAttemptHTTP2:  true,
-			HTTP2:              nil,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://"+desc.Endpoint, nil)
+	protos := &http.Protocols{}
+	protos.SetHTTP2(true)
+	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS13, protos)
 	if err != nil {
-		return fmt.Errorf("new req: %w", err)
+		return err
 	}
 	return CheckReq(cl, req, desc)
 }
@@ -290,6 +240,12 @@ func CheckReq(cl *http.Client, req *http.Request, desc EndpointDescription) erro
 		req.Header.Set("User-Agent", desc.UserAgent) //"Mozilla/5.0 (Android 16; Mobile; rv:154.0) Gecko/154.0 Firefox/154.0")
 	} else {
 		req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
+	}
+	padTotal := 29_000
+	padMax := 4_000
+	for i := 0; padTotal > 0; i++ {
+		req.Header.Set("X-Pad-"+strconv.Itoa(i), strings.Repeat("X", padMax))
+		padTotal -= padMax
 	}
 	rsp, err := cl.Do(req)
 	if err != nil {
