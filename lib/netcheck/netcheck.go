@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maxsupermanhd/lac/v2"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func CheckEndpointResolve(ctx context.Context, desc EndpointDescription) error {
+func CheckEndpointResolve(_ lac.Conf, ctx context.Context, desc EndpointDescription) error {
 	domain := strings.Split(desc.Endpoint, "/")[0]
 	addrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
 	if err != nil {
@@ -43,7 +44,7 @@ func CheckEndpointResolve(ctx context.Context, desc EndpointDescription) error {
 	}
 }
 
-func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
+func CheckEndpointPing(_ lac.Conf, ctx context.Context, desc EndpointDescription) error {
 	domain := strings.Split(desc.Endpoint, "/")[0]
 	addrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", domain)
 	if err != nil {
@@ -109,11 +110,25 @@ func CheckEndpointPing(ctx context.Context, desc EndpointDescription) error {
 	}
 }
 
-func NewDefaultRequest(ctx context.Context, desc EndpointDescription, proto string, tlsVer uint16, protos *http.Protocols) (*http.Client, *http.Request, error) {
+func NewDefaultRequest(cfg lac.Conf, ctx context.Context, desc EndpointDescription, proto string, tlsVer uint16, protos *http.Protocols) (*http.Client, *http.Request, error) {
 	if protos == nil {
 		protos = &http.Protocols{}
 		protos.SetHTTP1(true)
 	}
+	// dialer := &net.Dialer{
+	// 	Resolver: &net.Resolver{
+	// 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+	// 			d2 := &net.Dialer{
+	// 				Timeout: time.Duration(cfg.GetDInt(10, "dnsDialTimeoutSeconds")) * time.Second,
+	// 			}
+	// 			return d2.DialContext(ctx, network, cfg.GetDString(address, "dnsServerIP"))
+	// 		},
+	// 	},
+	// }
+
+	// "dnsDialTimeoutSeconds": 10,
+	// "dnsServerIP": "8.8.8.8",
+
 	cl := &http.Client{
 		Transport: &http.Transport{
 			ReadBufferSize: 1,
@@ -125,63 +140,64 @@ func NewDefaultRequest(ctx context.Context, desc EndpointDescription, proto stri
 			DisableCompression: true,
 			IdleConnTimeout:    time.Millisecond,
 			Protocols:          protos,
+			// DialContext:        dialer.DialContext,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", proto+"://"+desc.Endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, cfg.GetDString("GET", "httpMethod"), proto+"://"+desc.Endpoint, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("new req: %w", err)
 	}
 	return cl, req, nil
 }
 
-func CheckEndpointPlainHTTP(ctx context.Context, desc EndpointDescription) error {
-	cl, req, err := NewDefaultRequest(ctx, desc, "http", 0, nil)
+func CheckEndpointPlainHTTP(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
+	cl, req, err := NewDefaultRequest(cfg, ctx, desc, "http", 0, nil)
 	if err != nil {
 		return err
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckEndpointTLS12(ctx context.Context, desc EndpointDescription) error {
-	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS12, nil)
+func CheckEndpointTLS12(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
+	cl, req, err := NewDefaultRequest(cfg, ctx, desc, "https", tls.VersionTLS12, nil)
 	if err != nil {
 		return err
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckEndpointTLS12HTTP2(ctx context.Context, desc EndpointDescription) error {
+func CheckEndpointTLS12HTTP2(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
 	protos := &http.Protocols{}
 	protos.SetHTTP2(true)
-	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS12, protos)
+	cl, req, err := NewDefaultRequest(cfg, ctx, desc, "https", tls.VersionTLS12, protos)
 	if err != nil {
 		return err
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckEndpointTLS13(ctx context.Context, desc EndpointDescription) error {
-	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS13, nil)
+func CheckEndpointTLS13(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
+	cl, req, err := NewDefaultRequest(cfg, ctx, desc, "https", tls.VersionTLS13, nil)
 	if err != nil {
 		return err
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckEndpointTLS13HTTP2(ctx context.Context, desc EndpointDescription) error {
+func CheckEndpointTLS13HTTP2(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
 	protos := &http.Protocols{}
 	protos.SetHTTP2(true)
-	cl, req, err := NewDefaultRequest(ctx, desc, "https", tls.VersionTLS13, protos)
+	cl, req, err := NewDefaultRequest(cfg, ctx, desc, "https", tls.VersionTLS13, protos)
 	if err != nil {
 		return err
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error {
+func CheckEndpointTLS13ECH(cfg lac.Conf, ctx context.Context, desc EndpointDescription) error {
 	dialer := &net.Dialer{}
 	domain := strings.Split(desc.Endpoint, "/")[0]
 	tlsConfig := &tls.Config{
@@ -200,7 +216,7 @@ func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error 
 			ForceAttemptHTTP2:  false,
 			HTTP2:              nil,
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				ech, err := lookupHTTPS(domain)
+				ech, err := lookupHTTPS(cfg.GetDString("8.8.8.8", "dnsResolverIP"), domain)
 				if err != nil {
 					return nil, err
 				}
@@ -232,17 +248,17 @@ func CheckEndpointTLS13ECH(ctx context.Context, desc EndpointDescription) error 
 	if err != nil {
 		return fmt.Errorf("new req: %w", err)
 	}
-	return CheckReq(cl, req, desc)
+	return CheckReq(cfg, cl, req, desc)
 }
 
-func CheckReq(cl *http.Client, req *http.Request, desc EndpointDescription) error {
+func CheckReq(cfg lac.Conf, cl *http.Client, req *http.Request, desc EndpointDescription) error {
 	if desc.UserAgent != "" {
 		req.Header.Set("User-Agent", desc.UserAgent) //"Mozilla/5.0 (Android 16; Mobile; rv:154.0) Gecko/154.0 Firefox/154.0")
 	} else {
 		req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	}
-	padTotal := 29_000
-	padMax := 4_000
+	padTotal := cfg.GetDInt(29_000, "padTotalBytes")
+	padMax := cfg.GetDInt(2_000, "padHeaderMaxBytes")
 	for i := 0; padTotal > 0; i++ {
 		req.Header.Set("X-Pad-"+strconv.Itoa(i), strings.Repeat("X", padMax))
 		padTotal -= padMax
@@ -283,7 +299,7 @@ func CheckReq(cl *http.Client, req *http.Request, desc EndpointDescription) erro
 	return nil
 }
 
-func lookupHTTPS(domain string) (ret []byte, err error) {
+func lookupHTTPS(resolverIP string, domain string) (ret []byte, err error) {
 
 	var msg dnsmessage.Message
 	msg.Header.ID = 12345
@@ -304,7 +320,7 @@ func lookupHTTPS(domain string) (ret []byte, err error) {
 
 	addr := net.UDPAddr{
 		Port: 53,
-		IP:   net.ParseIP("8.8.8.8"),
+		IP:   net.ParseIP(resolverIP),
 	}
 	conn, err := net.DialUDP("udp", nil, &addr)
 	if err != nil {

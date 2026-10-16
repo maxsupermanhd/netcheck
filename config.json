@@ -6,7 +6,12 @@
 		"initialPauseSeconds": 60,
 		"checksIntervalSeconds": 900,
 		"staggerSleepMilliseconds": 1000,
-		"checkTimeoutSeconds": 5
+		"checkTimeoutSeconds": 5,
+		"checkParams": {
+			"httpMethod": "GET",
+			"padTotalBytes": 29000,
+			"padHeaderMaxBytes": 2000
+		}
 	},
 	"results": {
 		"path": "results.json",

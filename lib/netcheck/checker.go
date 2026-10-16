@@ -157,7 +157,7 @@ func (c *Checker) Run(ctx context.Context) {
 	}
 }
 
-type CheckFunc func(context.Context, EndpointDescription) error
+type CheckFunc func(lac.Conf, context.Context, EndpointDescription) error
 
 type Check struct {
 	Name      string
@@ -187,6 +187,8 @@ func (c *Checker) doChecks(ctx context.Context) {
 	endpoints := slices.Clone(c.endpoints)
 	c.lock.Unlock()
 
+	checkParams := c.cfg.LinkSubTree("checkParams")
+
 	wg := &sync.WaitGroup{}
 	for i, endpoint := range endpoints {
 		wg.Go(func() {
@@ -215,7 +217,7 @@ func (c *Checker) doChecks(ctx context.Context) {
 				c.lock.Unlock()
 
 				cctx, cctxCancel := context.WithTimeout(ctx, time.Duration(c.cfg.GetDInt(10, "checkTimeoutSeconds"))*time.Second)
-				cres := performCheck(cctx, check.Fn, endpoint)
+				cres := performCheck(checkParams, cctx, check.Fn, endpoint)
 				cctxCancel()
 
 				c.lock.Lock()
@@ -260,9 +262,9 @@ var (
 	}
 )
 
-func performCheck(ctx context.Context, checkFn CheckFunc, desc EndpointDescription) CheckResult {
+func performCheck(cfg lac.Conf, ctx context.Context, checkFn CheckFunc, desc EndpointDescription) CheckResult {
 	perf := time.Now()
-	err := checkFn(ctx, desc)
+	err := checkFn(cfg, ctx, desc)
 	ret := CheckResult{
 		Brief:   "OK",
 		Color:   "green",
