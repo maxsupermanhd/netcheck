@@ -257,7 +257,7 @@ func CheckReq(cfg lac.Conf, cl *http.Client, req *http.Request, desc EndpointDes
 	} else {
 		req.Header.Add("User-Agent", "netcheck github.com/maxsupermanhd/netcheck")
 	}
-	padTotal := cfg.GetDInt(29_000, "padTotalBytes")
+	padTotal := cfg.GetDInt(0, "padTotalBytes")
 	padMax := cfg.GetDInt(2_000, "padHeaderMaxBytes")
 	for i := 0; padTotal > 0; i++ {
 		req.Header.Set("X-Pad-"+strconv.Itoa(i), strings.Repeat("X", padMax))

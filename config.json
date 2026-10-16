@@ -9,7 +9,7 @@
 		"checkTimeoutSeconds": 5,
 		"checkParams": {
 			"httpMethod": "GET",
-			"padTotalBytes": 29000,
+			"padTotalBytes": 0,
 			"padHeaderMaxBytes": 2000
 		}
 	},
