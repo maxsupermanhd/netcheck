@@ -42,7 +42,14 @@ func main() {
 		log.Err(saveJson(resultsStoragePath, storedResults.Get())).Msg("results saved")
 	}
 	storedResults = netcheck.NewResultsStorage(noerr(loadJsonIfExists[[]netcheck.RunResults](resultsStoragePath)), cfg.GetDInt(50, "results", "limit"))
-	netChecker = netcheck.NewChecker(log.Logger, cfg.DupSubTree("netcheck"), getConfigEndpoints(), netChecks, resultsSaveFunc)
+	dialer, err := netcheck.NewDialer(cfg.GetDString("", "netcheck", "proxy"), cfg.LinkSubTree("netcheck", "dns"))
+	if err != nil {
+		log.Fatal().Err(err).Msg("proxy or dns config")
+	}
+	if dialer.Proxy != nil {
+		log.Info().Str("proxy", dialer.Proxy.Host()).Msg("all connections go through the proxy")
+	}
+	netChecker = netcheck.NewChecker(log.Logger, cfg.DupSubTree("netcheck"), dialer, getConfigEndpoints(), netChecks, resultsSaveFunc)
 
 	stopHttp := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "http", httpRoutine)
 	stopChecker := flexutils.StartBackgroundRoutineCtx(context.Background(), log.Logger, "checker", netChecker.Run)

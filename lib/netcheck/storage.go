@@ -41,6 +41,7 @@ func (s *ResultsStorage) Get() []RunResults {
 	ret := make([]RunResults, len(s.results))
 	for i, v := range s.results {
 		ret[i].StartedAt = v.StartedAt
+		ret[i].Proxy = v.Proxy
 		results := make([]EndpointResults, len(v.Results))
 		for i2, v2 := range v.Results {
 			results[i2] = v2.Clone()

@@ -3,6 +3,7 @@ package netcheck
 import (
 	"context"
 	"errors"
+	"main/lib/proxyconn"
 	"maps"
 	"slices"
 	"sync"
@@ -52,6 +53,7 @@ func (e CheckResult) Is(target error) bool {
 type RunResults struct {
 	StartedAt time.Time         `json:"startedAt"`
 	Duration  time.Duration     `json:"duration"`
+	Proxy     string            `json:"proxy,omitempty"`
 	Results   []EndpointResults `json:"results"`
 }
 
@@ -69,6 +71,7 @@ func (e EndpointResults) Clone() EndpointResults {
 type Checker struct {
 	logger zerolog.Logger
 	cfg    lac.Conf
+	dialer *Dialer
 
 	endpoints []EndpointDescription
 	results   []EndpointResults
@@ -81,10 +84,11 @@ type Checker struct {
 	resultsLogger func(RunResults)
 }
 
-func NewChecker(l zerolog.Logger, cfg lac.Conf, n []EndpointDescription, checks []Check, resultsLogger func(RunResults)) *Checker {
+func NewChecker(l zerolog.Logger, cfg lac.Conf, dialer *Dialer, n []EndpointDescription, checks []Check, resultsLogger func(RunResults)) *Checker {
 	c := &Checker{
 		logger:         l,
 		cfg:            cfg,
+		dialer:         dialer,
 		updateListener: make(chan struct{}),
 		checks:         checks,
 		resultsLogger:  resultsLogger,
@@ -144,11 +148,15 @@ func (c *Checker) Run(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 			default:
-				c.resultsLogger(RunResults{
+				res := RunResults{
 					StartedAt: timings,
 					Duration:  time.Since(timings),
 					Results:   c.GetResults(),
-				})
+				}
+				if c.dialer.Proxy != nil {
+					res.Proxy = c.dialer.Proxy.Host()
+				}
+				c.resultsLogger(res)
 			}
 		}
 		if waitOrAbort(ctx.Done(), time.Duration(c.cfg.GetDInt(10, "checksIntervalSeconds"))*time.Second) {
@@ -157,7 +165,7 @@ func (c *Checker) Run(ctx context.Context) {
 	}
 }
 
-type CheckFunc func(lac.Conf, context.Context, EndpointDescription) error
+type CheckFunc func(lac.Conf, context.Context, *Dialer, EndpointDescription) error
 
 type Check struct {
 	Name      string
@@ -189,6 +197,12 @@ func (c *Checker) doChecks(ctx context.Context) {
 
 	checkParams := c.cfg.LinkSubTree("checkParams")
 
+	if err := c.dialer.DNS.Reset(ctx); err != nil {
+		c.logger.Warn().Err(err).Msg("dns method selection failed, all checks show PROXY")
+	} else {
+		c.logger.Info().Str("method", c.dialer.DNS.Method()).Msg("dns method")
+	}
+
 	wg := &sync.WaitGroup{}
 	for i, endpoint := range endpoints {
 		wg.Go(func() {
@@ -217,7 +231,7 @@ func (c *Checker) doChecks(ctx context.Context) {
 				c.lock.Unlock()
 
 				cctx, cctxCancel := context.WithTimeout(ctx, time.Duration(c.cfg.GetDInt(10, "checkTimeoutSeconds"))*time.Second)
-				cres := performCheck(checkParams, cctx, check.Fn, endpoint)
+				cres := performCheck(checkParams, cctx, c.dialer, check.Fn, endpoint)
 				cctxCancel()
 
 				c.lock.Lock()
@@ -262,9 +276,9 @@ var (
 	}
 )
 
-func performCheck(cfg lac.Conf, ctx context.Context, checkFn CheckFunc, desc EndpointDescription) CheckResult {
+func performCheck(cfg lac.Conf, ctx context.Context, dialer *Dialer, checkFn CheckFunc, desc EndpointDescription) CheckResult {
 	perf := time.Now()
-	err := checkFn(cfg, ctx, desc)
+	err := checkFn(cfg, ctx, dialer, desc)
 	ret := CheckResult{
 		Brief:   "OK",
 		Color:   "green",
@@ -275,6 +289,12 @@ func performCheck(cfg lac.Conf, ctx context.Context, checkFn CheckFunc, desc End
 		return ret
 	}
 	ret.Content = err.Error()
+	if _, ok := errors.AsType[proxyconn.ErrProxy](err); ok {
+		ret.Brief = "PROXY"
+		ret.Color = "gray"
+		ret.Success = 0
+		return ret
+	}
 	if err2, ok := errors.AsType[CheckResult](err); ok {
 		err2.Took = time.Since(perf)
 		return err2

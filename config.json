@@ -11,6 +11,12 @@
 			"httpMethod": "GET",
 			"padTotalBytes": 0,
 			"padHeaderMaxBytes": 2000
+		},
+		"dns": {
+			"tcpServer": "8.8.8.8:53",
+			"dohURL": "https://1.1.1.1/dns-query",
+			"probeName": "dns.google",
+			"probeTimeoutSeconds": 3
 		}
 	},
 	"results": {

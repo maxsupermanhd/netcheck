@@ -103,7 +103,7 @@ func HistoryBox(res []netcheck.RunResults, currentViewing *time.Time, currentVie
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<table class=\"historyTable\"><colgroup><col span=\"1\"> <col span=\"1\" style=\"width: 100px;\"> <col span=\"1\"></colgroup><tr><td colspan=\"3\"><div class=\"viewBtns\"><form><input type=\"hidden\" name=\"data\" value=\"live\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<table class=\"historyTable nowrap\"><colgroup><col span=\"1\"> <col span=\"1\" style=\"width: 100px;\"> <col span=\"1\"></colgroup><tr><td colspan=\"3\"><div class=\"viewBtns\"><form><input type=\"hidden\" name=\"data\" value=\"live\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
